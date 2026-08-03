@@ -186,6 +186,24 @@ describe('captures visuelles', () => {
     shot('17-epave');
   });
 
+  it('18 — layout mobile (pad compact, jeu plus grand)', () => {
+    cy.viewport(390, 844);   // iPhone portrait
+    cy.visit('/kiteline-3d.html');
+    cy.window().its('KITELINE').should('exist');
+    cy.window().then(w => { w.KITELINE.begin(); const G = w.KITELINE.G; G.heading = 0; steps(w, 40); });
+    cy.wait(200).screenshot('18-mobile', { overwrite: true, capture: 'viewport' });
+  });
+
+  it('19 — layout paysage mobile (contrôles à gauche/droite)', () => {
+    cy.viewport(844, 390);   // iPhone paysage
+    cy.visit('/kiteline-3d.html');
+    cy.window().its('KITELINE').should('exist');
+    cy.window().then(w => { w.KITELINE.begin(); const G = w.KITELINE.G; G.heading = 0; steps(w, 40); });
+    cy.get('#dpad').should('be.visible');
+    cy.get('#acts').should('be.visible');
+    cy.wait(200).screenshot('19-mobile-paysage', { overwrite: true, capture: 'viewport' });
+  });
+
   it('08 — écran de fin', () => {
     cy.window().then(w => {
       w.KITELINE.begin();

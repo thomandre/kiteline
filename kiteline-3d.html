@@ -36,20 +36,36 @@ body{background:#0B3C5D;color:#F7FBFF;font-family:ui-monospace,"SF Mono",Menlo,C
 #veil p{font-size:clamp(9px,1.7cqw,20px);opacity:.85;max-width:72cqw;line-height:1.8}
 #veil .go{color:#FF4FA3;font-size:clamp(10px,1.9cqw,22px);letter-spacing:.2em;margin-top:1.4cqw;animation:bl 1s steps(2) infinite}
 @keyframes bl{50%{opacity:.15}}
-#pad{flex:1 1 auto;width:100%;max-width:600px;display:grid;grid-template-columns:1fr 1.5fr;gap:9px;padding:10px}
-.grp{display:grid;gap:6px}
+#pad{flex:0 0 auto;width:100%;max-width:600px;display:grid;grid-template-columns:1fr 1.5fr;gap:6px;padding:6px 8px}
+.grp{display:grid;gap:5px}
 #dpad{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
 #acts{grid-template-columns:1fr 1fr 1fr;grid-template-rows:auto 1fr}
-button{font-family:inherit;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+button{font-family:inherit;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
  color:#F7FBFF;background:#2B2F36;border:1px solid #2ED3E6;border-bottom-width:3px;border-radius:3px;
- padding:12px 2px;min-height:42px}
+ padding:5px 2px;min-height:30px;
+ -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;touch-action:none}
 button.on{background:#2ED3E6;border-color:#F7FBFF;color:#0B3C5D;border-bottom-width:1px;transform:translateY(1px)}
 #bEdge{grid-column:1/-1;background:#0B3C5D;border-color:#FFD400;color:#FFD400}
 #bEdge.on{background:#FFD400;color:#0B3C5D}
 #bLoop{color:#FF4FA3;background:#2B2F36;border-color:#7a2a55}
 #bLoop.rdy{background:#FF4FA3;border-color:#F7FBFF;color:#fff}
 #keys{font-size:8px;opacity:.45;padding:4px 10px 8px;text-align:center;letter-spacing:.08em}
-@media(min-width:760px){#pad{display:none}}
+/* desktop (large ET haut) : pas de pad tactile. Un tel critère laisse le pad sur les
+   téléphones paysage (larges mais bas). */
+@media(min-width:760px) and (min-height:600px){#pad{display:none}}
+@media(max-width:759px){#keys{display:none}}   /* légende clavier inutile sur mobile */
+/* PAYSAGE MOBILE : jeu plein écran, contrôles collés à gauche et à droite */
+@media (orientation:landscape) and (max-height:560px){
+  #keys{display:none}
+  #stage{width:100vw;height:100vh}
+  #stage>canvas{width:100vw!important;height:100vh!important}
+  #pad{position:fixed;inset:0;z-index:5;width:100vw;height:100vh;max-width:none;
+       padding:0;background:none;pointer-events:none;
+       display:flex;justify-content:space-between;align-items:flex-end}
+  #dpad,#acts{pointer-events:auto;width:29vw;max-width:210px;margin:0 2vw 3vh;
+       background:rgba(11,44,66,.22);border-radius:14px;padding:7px;backdrop-filter:blur(2px)}
+  #pad button{min-height:34px}
+}
 </style>
 </head>
 <body>
@@ -804,6 +820,7 @@ const buoyM=[];
 
 /* --- squelette anatomique du rider (constantes vérifiées par les tests Cypress) :
    points partagés entre segments = membres continus ; pieds dans la planche. --- */
+const UPIV=[0,1.02,0.02];   // pivot du haut du corps = les hanches (le buste s'incline SANS décoller le bassin)
 const RIG={
   boardHalfW:0.22, boardTop:0.075,
   footHalfW:0.13,   // demi-longueur du pied (en travers de la planche)
@@ -942,8 +959,11 @@ let hairGrp, lowerGrp, upperGrp, armLGrp, armRGrp, barMesh, hairLocks=[], grabAr
 
   /* le HAUT du corps est regroupé pour l'orienter de profil vers l'aile
      (stance de kite) sans toucher à la planche/aux jambes. */
-  upperGrp=new THREE.Group();
-  upperGrp.add(pelvis,harness,hook,torso,chest,armLGrp,armRGrp,bar,neck,head,shades,hairGrp);
+  upperGrp=new THREE.Group(); upperGrp.position.set(UPIV[0],UPIV[1],UPIV[2]);
+  for(const m of [pelvis,harness,hook,torso,chest,armLGrp,armRGrp,bar,neck,head,shades,hairGrp]){
+    m.position.x-=UPIV[0]; m.position.y-=UPIV[1]; m.position.z-=UPIV[2];   // recentrés sur le pivot hanches
+    upperGrp.add(m);
+  }
   rider.add(lowerGrp,upperGrp,grabArm,grabHand);
 }
 const riderPivot=new THREE.Group(); riderPivot.add(rider); scene.add(riderPivot);
@@ -1342,7 +1362,9 @@ function frame(now){
   /* le rider se suspend à l'aile : gîte contre la traction, côté au vent.
      cos(cap) inverse le sens à chaque changement d'amure. */
   const lean=clamp((0.18+G.power*G.eff*0.5+G.load*0.55)*(G.air?0.35:1)*(G.edging?1.5:1),0,0.75)*Math.cos(G.heading);
-  rider.rotation.z=G.crashT>0?Math.sin(G.t*20)*0.25:((G.kiteWet||G.sat>0)?0:lean);
+  /* la PLANCHE est sur la CARRE (edging) : jusqu'à ~20° quand on charge ; le reste
+     de la gîte va sur le CORPS (buste incliné contre la traction, plus bas). */
+  rider.rotation.z=G.crashT>0?Math.sin(G.t*20)*0.25:((G.kiteWet||G.sat>0)?0:lean*0.47);
   rider.position.y=G.crashT>0?-0.25:(G.sat>0?-0.75:(G.kiteWet?-0.3:0));
   /* cheveux de surfer : soulevés/tirés vers l'arrière par le vent apparent,
      chaque mèche ondule et fouette (plus la vitesse est haute, plus ça vole). */
@@ -1406,6 +1428,10 @@ function frame(now){
     let face=Math.PI/2-G.heading; face=((face+Math.PI)%TAU+TAU)%TAU-Math.PI;
     const target=(G.air||G.crashT>0||G.sat>0)?0:clamp(face,-1.0,1.0)*0.7;
     upperGrp.rotation.y+=(target-upperGrp.rotation.y)*pk*0.6;
+    /* le buste encaisse l'essentiel de la gîte (corps suspendu à l'aile) pendant que
+       la planche reste à plat sur l'eau. */
+    const bodyLean=(G.air||G.crashT>0||G.sat>0)?0:lean*0.6;
+    upperGrp.rotation.z+=(bodyLean-upperGrp.rotation.z)*pk*0.6;
   }
 
   /* ombre portée */
@@ -1445,7 +1471,7 @@ function frame(now){
      bras dessiné la relie à l'épaule → on VOIT la main tenir la planche. */
   if(G.air&&G.grabHeld){
     const gp=GRABPOSE[G.grabName]||GRABPOSE['Indy'], L=gp.hand==='L';
-    _p1.set(L?-0.27:0.27,1.72,0.16); upperGrp.localToWorld(_p1); rider.worldToLocal(_p1);   // épaule
+    _p1.set((L?-0.27:0.27)-UPIV[0],1.72-UPIV[1],0.16-UPIV[2]); upperGrp.localToWorld(_p1); rider.worldToLocal(_p1);   // épaule
     _p2.set(gp.tilt>0?-0.17:0.17,-0.93,0.12); lowerGrp.localToWorld(_p2); rider.worldToLocal(_p2); // rail
     grabHand.position.copy(_p2); grabHand.visible=true;
     _d.subVectors(_p2,_p1); const Ld=Math.max(0.05,_d.length());
@@ -1617,14 +1643,22 @@ function hud(G){
 }
 
 function fit(){
+  /* paysage mobile : plein écran (les contrôles flottent sur les côtés) */
+  if(matchMedia('(orientation:landscape) and (max-height:560px)').matches){
+    stage.style.width=innerWidth+'px';
+    renderer.setSize(innerWidth,innerHeight);
+    cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix();
+    return;
+  }
   const desktop=innerWidth>=760;
   const maxW=desktop?innerWidth-16:Math.min(innerWidth,600);
-  const maxH=innerHeight*(desktop?0.93:0.60);
+  const maxH=innerHeight*(desktop?0.93:0.68);
   const ww=Math.min(maxW,maxH*AR), wh=ww/AR;
   stage.style.width=ww+'px';
   renderer.setSize(ww,wh);           // rend à la taille affichée × DPR (net)
   cam.aspect=ww/wh; cam.updateProjectionMatrix();
 }
+addEventListener('orientationchange',()=>setTimeout(fit,100));
 addEventListener('resize',fit); fit();
 requestAnimationFrame(frame);
 
