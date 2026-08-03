@@ -82,6 +82,16 @@ button.on{background:#2ED3E6;border-color:#F7FBFF;color:#0B3C5D;border-bottom-wi
   #acts{right:calc(env(safe-area-inset-right,0px) + 10px);grid-template-columns:repeat(3,64px);grid-auto-rows:54px;grid-template-rows:none}
   #acts #bEdge{grid-column:1/-1}
   #pad button{min-height:0;font-size:11px;padding:2px 1px}
+  /* Les contrôles occupent les coins bas ; on sort le HUD de ces zones :
+     rose des vents en bas-centre, loop en haut-centre, minimap resserrée
+     dans son coin haut-droit (que #acts n'atteint plus). */
+  #mini{top:6px;right:6px;width:92px;height:92px}
+  #hWind{left:50%;right:auto;bottom:calc(env(safe-area-inset-bottom,0px) + 6px);
+         transform:translateX(-50%);text-align:center;font-size:10px;letter-spacing:.14em}
+  #rose{width:44px;height:44px;margin:3px auto 0}
+  #hLoop{top:6px;bottom:auto;left:50%;right:auto;transform:translateX(-50%);text-align:center;font-size:10px}
+  #loopB{width:88px;height:5px;margin:3px auto 0}
+  #hTrick{left:50%;right:auto;bottom:auto;top:30px;transform:translateX(-50%);text-align:center;font-size:12px}
 }
 </style>
 </head>
