@@ -201,6 +201,21 @@ function heightAt(x,z){ return staticH(x,z)+swell(x,z); }
 function onPier(x,z){
   return x>PIER.x0-1.2&&x<PIER.x1+1.2&&z>PIER.z0&&z<PIER.z1;
 }
+/* rails « à glisser » en plus du ponton : le bateau et les cocotiers. Chaque rail
+   est un disque (x,z,r) ; y glisser garde le combo ouvert au lieu de faire une chute. */
+const RAILS=[
+  {x:90, z:120, r:6.0, name:'BATEAU'},     // l'épave de pirate
+  {x:162,z:144, r:2.6, name:'COCOTIER'},   // les 4 cocotiers de l'île
+  {x:176,z:158, r:2.6, name:'COCOTIER'},
+  {x:167,z:161, r:2.6, name:'COCOTIER'},
+  {x:173,z:140, r:2.6, name:'COCOTIER'}
+];
+function railInfo(x,z){
+  if(onPier(x,z)) return {name:'PONTON'};
+  for(const r of RAILS){ const dx=x-r.x,dz=z-r.z; if(dx*dx+dz*dz<r.r*r.r) return r; }
+  return null;
+}
+function onRail(x,z){ return !!railInfo(x,z); }
 
 /* --- vent : souffle vers +X. Le cap décide de tout. --- */
 const WIND={x:1,z:0};
@@ -436,7 +451,7 @@ function step(G,K,PRESS,dt){
     /* l'eau blanche et la terre ne se labourent pas : brisants ou plage = chute.
        Seul le ponton se traverse (c'est le rail). */
     const stH=staticH(G.x,G.z);
-    if(G.crashT<=0&&stH>2.6&&!onPier(G.x,G.z)){
+    if(G.crashT<=0&&stH>2.6&&!onRail(G.x,G.z)){
       G.bailT=2.0; G.crashT=2.0;   // wipeout appuyé : on reste, on se fait mal, on perd du temps
       say(G,'CHUTE — '+(stH>4.6?'ENSABLÉ':'BANC DE SABLE'));
       G.pot=0; G.mult=0; G.comboT=0; G.speed*=0.2; G.load=0;
@@ -444,15 +459,15 @@ function step(G,K,PRESS,dt){
       washOut(G);
     }
     /* face au vent / plus de vitesse : le rider s'assoit dans l'eau (pas de gros wipeout) */
-    if(G.crashT<=0&&G.sat<=0&&G.satCD<=0&&!G.kiteWet&&!onPier(G.x,G.z)
+    if(G.crashT<=0&&G.sat<=0&&G.satCD<=0&&!G.kiteWet&&!onRail(G.x,G.z)
        &&staticH(G.x,G.z)<2.6&&G.eff<0.12&&G.speed<3){
       G.sat=1; say(G,'FACE AU VENT');
       G.pot=0; G.mult=0; G.comboT=0; G.load=0;
       G.satSplash={x:G.x,y:ground+0.1,z:G.z};
     }
     /* ponton = rail : le combo reste ouvert et les points montent */
-    if(onPier(G.x,G.z)&&staticH(G.x,G.z)>1.8){
-      if(!G.grinding){G.grinding=true;G.grindT=0;say(G,'PIER SLIDE',true);}
+    if(onRail(G.x,G.z)&&staticH(G.x,G.z)>1.8){
+      if(!G.grinding){G.grinding=true;G.grindT=0;say(G,(railInfo(G.x,G.z).name)+' SLIDE',true);}
       G.grindT+=dt;
       if(G.mult>0) G.comboT=Math.max(G.comboT,0.9);
       if(G.grindT>1.2) G.goals.pier=1;
@@ -507,7 +522,7 @@ function land(G,ground){
   const fullRoll=Math.round(G.roll/360), rollOff=Math.abs(G.roll-fullRoll*360);
   let fail='';
   const stH=staticH(G.x,G.z);
-  if(stH>2.6&&!onPier(G.x,G.z)) fail=stH>4.6?'ENSABLÉ':'BANC DE SABLE';
+  if(stH>2.6&&!onRail(G.x,G.z)) fail=stH>4.6?'ENSABLÉ':'BANC DE SABLE';
   else if(spinOff>50) fail='ROTATION';
   else if(rollOff>55) fail='BACKROLL';
   else if(G.grabHeld) fail='GRAB TENU';
@@ -800,27 +815,52 @@ scene.add(farSea);
   };
   mkPalm(162,144,0.5); mkPalm(176,158,-0.4); mkPalm(167,161,0.3); mkPalm(173,140,-0.6);
 }
-/* --- l'épave : vieux chalutier rouillé, gîté et à moitié coulé (formes de coque,
-   plus une boîte). Coque = ellipsoïde allongé effilé aux bouts, proue conique. --- */
+/* --- l'épave : galion de pirate échoué sur le banc, gîté (coque bois, château
+   arrière surélevé, mâts + voiles gonflées, pavillon noir, beaupré). Que des
+   formes courbes — aucune boîte. C'est aussi un rail : on peut slider dessus. --- */
 {
-  const rust=toon(0x8a4a38), rustD=toon(0x6a3628), dark=toon(0x3a2a20), cabM=toon(0x9a6a4a);
+  const wood=toon(0x5b3a22), woodD=toon(0x33200f), plank=toon(0x7a5330),
+        trim=toon(0x9a6a2e), mastM=toon(0x6b4a29), rope=toon(0x2a1c10),
+        gold=hero(0xFFD400,0.3);
+  const sailM=new THREE.MeshToonMaterial({color:0xeee3c8,gradientMap:gradTex,side:THREE.DoubleSide});
+  const tornM=new THREE.MeshToonMaterial({color:0xcabd9f,gradientMap:gradTex,side:THREE.DoubleSide});
+  const flagM=new THREE.MeshToonMaterial({color:0x23262c,gradientMap:gradTex,side:THREE.DoubleSide});
+  const boneM=new THREE.MeshBasicMaterial({color:0xF2ECDE});
   const g=new THREE.Group();
-  const hull=new THREE.Mesh(new THREE.SphereGeometry(1.0,14,10),rust);
-  hull.scale.set(4.6,1.15,1.5); hull.position.y=0.4;                 // coque arrondie allongée
-  const belly=new THREE.Mesh(new THREE.SphereGeometry(1.0,12,8),rustD);
-  belly.scale.set(3.4,1.0,1.2); belly.position.set(0.2,-0.35,0);     // ventre sous la ligne de flottaison
-  const bow=new THREE.Mesh(new THREE.ConeGeometry(1.35,3.0,12),rust);
-  bow.rotation.z=-Math.PI/2; bow.position.set(4.4,0.45,0);           // proue effilée
-  const deck=new THREE.Mesh(new THREE.CylinderGeometry(1.3,1.5,0.4,12,1,false,0,Math.PI),rustD);
-  deck.rotation.set(Math.PI,0,Math.PI/2); deck.scale.set(1,4.4,1); deck.position.y=0.95;
-  const cab=new THREE.Mesh(new THREE.SphereGeometry(1.0,10,8),cabM);
-  cab.scale.set(1.3,0.9,1.1); cab.position.set(-1.4,1.5,0);          // cabine arrondie
-  const funnel=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.4,1.3,10),dark);
-  funnel.position.set(-2.2,1.9,0);
-  const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.13,6,6),dark);
-  mast.rotation.z=0.6; mast.position.set(0.6,2.6,0.2);               // mât cassé penché
-  g.add(belly,hull,bow,deck,cab,funnel,mast);
-  g.position.set(90,staticH(90,120)-0.3,120); g.rotation.set(0.12,0.5,0.32);  // gîte + à moitié coulé
+  const add=(geo,mat,fn)=>{const m=new THREE.Mesh(geo,mat);fn&&fn(m);g.add(m);return m;};
+  const S=THREE.SphereGeometry, C=THREE.CylinderGeometry;
+  // coque (ellipsoïde) + ventre sombre sous flottaison
+  add(new S(1,18,12),wood,m=>{m.scale.set(5.0,1.25,1.7);m.position.y=0.35;});
+  add(new S(1,14,9),woodD,m=>{m.scale.set(4.2,1.05,1.35);m.position.set(0.1,-0.45,0);});
+  // liston doré qui court le long de la coque
+  add(new THREE.TorusGeometry(1.62,0.07,6,30),gold,m=>{m.rotation.x=Math.PI/2;m.scale.set(2.6,1.0,1.0);m.position.y=0.7;});
+  // proue montante + beaupré
+  add(new C(0.9,1.25,3.2,14),wood,m=>{m.rotation.z=-Math.PI/2;m.position.set(4.7,0.55,0);});
+  add(new C(0.05,0.1,3.2,6),mastM,m=>{m.rotation.z=-Math.PI/2-0.32;m.position.set(6.0,1.4,0);});
+  // château arrière surélevé (galion) + sa dunette
+  add(new S(1,14,11),wood,m=>{m.scale.set(1.35,1.5,1.6);m.position.set(-4.0,1.15,0);});
+  add(new C(1.15,1.3,0.5,14),plank,m=>{m.scale.set(1.25,1,1.35);m.position.set(-4.15,2.25,0);});
+  add(new C(0.1,0.13,1.2,8),mastM,m=>{m.position.set(-5.2,2.4,0);});   // fanal arrière
+  add(new S(0.18,8,6),gold,m=>{m.position.set(-5.2,3.1,0);});
+  // pont (surface de grind) + pavois ovale
+  add(new C(1.55,1.72,0.35,22),plank,m=>{m.scale.set(2.7,1,1.0);m.position.y=0.92;});
+  add(new THREE.TorusGeometry(1.6,0.12,8,28),trim,m=>{m.rotation.x=Math.PI/2;m.scale.set(2.55,1.0,1.0);m.position.y=1.18;});
+  // sabords + canons sur le flanc bâbord (vers +z, face caméra)
+  for(const cx of [1.6,-0.2,-1.9]){
+    add(new C(0.16,0.16,0.12,10),woodD,m=>{m.rotation.x=Math.PI/2;m.position.set(cx,0.55,1.55);});
+    add(new C(0.09,0.12,0.7,8),rope,m=>{m.rotation.x=Math.PI/2;m.position.set(cx,0.55,1.75);});
+  }
+  // grand mât + vergue + voile gonflée
+  add(new C(0.13,0.18,7.2,8),mastM,m=>{m.position.set(-0.5,3.5,0);});
+  add(new C(0.06,0.06,4.4,6),mastM,m=>{m.rotation.x=Math.PI/2;m.position.set(-0.5,4.7,0);});
+  add(new C(2.2,2.2,3.0,14,1,true,Math.PI/2-0.5,1.0),sailM,m=>{m.position.set(-0.5-2.06,3.3,0);});
+  // pavillon noir (Jolly Roger) au sommet
+  add(new THREE.PlaneGeometry(1.1,0.7),flagM,m=>{m.position.set(-0.5,7.1,0.02);});
+  add(new THREE.CircleGeometry(0.14,10),boneM,m=>{m.position.set(-0.72,7.18,0.04);});
+  // mât de misaine cassé, penché, voile déchirée (l'épave)
+  add(new C(0.1,0.14,4.6,8),mastM,m=>{m.rotation.z=0.26;m.position.set(2.5,2.4,0);});
+  add(new C(1.7,1.7,2.0,12,1,true,Math.PI/2-0.42,0.84),tornM,m=>{m.rotation.z=0.26;m.position.set(2.5-1.55,2.5,0);m.scale.y=0.8;});
+  g.position.set(90,staticH(90,120)-0.6,120); g.rotation.set(0.05,0.5,0.17);  // échoué, légèrement gîté
   scene.add(g);
 }
 /* --- les lettres K·I·T·E : vraies lettres 3D dorées qui tournoient --- */
@@ -1719,7 +1759,7 @@ window.KITELINE={
   get G(){return PROBE}, set G(v){PROBE=v},
   KEYS,PRESS,MAP,setK,begin,restart,
   step:d=>step(PROBE,KEYS,PRESS,d||1/60),
-  heightAt,staticH,pointAngle,pointEff,
+  heightAt,staticH,pointAngle,pointEff,onRail,railInfo,
   kiteFall:()=>kiteFall(PROBE),
   RIG, photo:null,
   newState, version:'v5'

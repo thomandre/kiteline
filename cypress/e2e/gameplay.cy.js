@@ -341,4 +341,43 @@ describe('gameplay', () => {
     });
     cy.get('#veil').should('be.visible').and('contain', 'FIN DE RUN');
   });
+
+  it('le bateau (épave) est un rail : on slide dessus au lieu de se crasher', () => {
+    cy.window().then(w => {
+      const G = w.KITELINE.G;
+      expect(w.KITELINE.onRail(90, 120)).to.eq(true);
+      G.x = 90; G.z = 120; G.air = false; G.speed = 12; G.heading = 0;
+      G.mult = 1; G.pot = 100; G.crashT = 0;
+      steps(w, 3);
+      expect(G.grinding, 'grinding sur le bateau').to.eq(true);
+      expect(G.crashT, 'pas de wipeout').to.be.lessThan(0.1);
+    });
+  });
+
+  it('les cocotiers sont des rails grindables', () => {
+    cy.window().then(w => {
+      const G = w.KITELINE.G;
+      expect(w.KITELINE.onRail(162, 144)).to.eq(true);
+      expect(w.KITELINE.railInfo(162, 144).name).to.eq('COCOTIER');
+      G.x = 162; G.z = 144; G.air = false; G.speed = 10; G.heading = 0;
+      G.mult = 1; G.pot = 100; G.crashT = 0;
+      steps(w, 3);
+      expect(G.grinding, 'grinding sur le cocotier').to.eq(true);
+      expect(G.crashT).to.be.lessThan(0.1);
+    });
+  });
+
+  it('slider un rail crédite des points quand on en sort', () => {
+    cy.window().then(w => {
+      const G = w.KITELINE.G;
+      G.x = 90; G.z = 120; G.air = false; G.speed = 12; G.heading = 0;
+      G.mult = 1; G.pot = 0; G.crashT = 0;
+      steps(w, 6);                       // on glisse un moment
+      expect(G.grinding).to.eq(true);
+      G.x = 40; G.z = 20;                // on quitte le rail (pleine eau)
+      steps(w, 1);
+      expect(G.grinding).to.eq(false);
+      expect(G.pot, 'le slide a crédité le pot').to.be.greaterThan(0);
+    });
+  });
 });

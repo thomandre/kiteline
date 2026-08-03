@@ -175,12 +175,12 @@ describe('captures visuelles', () => {
     cy.window().then(w => { w.KITELINE.photo = false; w.KITELINE.setK('edge', 0); });
   });
 
-  it("17 — l'épave (chalutier rouillé, plus une boîte)", () => {
+  it("17 — l'épave (galion de pirate échoué)", () => {
     cy.window().then(w => {
       w.KITELINE.begin();
       const G = w.KITELINE.G;
-      G.x = 106; G.z = 134; G.speed = 7;
-      G.heading = Math.atan2(90 - G.x, 120 - G.z);   // vise l'épave (90,120)
+      G.x = 108; G.z = 138; G.speed = 6;
+      G.heading = Math.atan2(90 - G.x, 120 - G.z);   // vise l'épave de pirate (90,120)
       steps(w, 2, 0.016);
     });
     shot('17-epave');
