@@ -1326,7 +1326,9 @@ function veilAutoScroll(){
     })(performance.now());
   },2000);
 }
-function begin(){ clearTimeout(veilScrollT); if(PROBE.phase==='over')restart(); PROBE.phase='run'; veil.style.display='none'; }
+let _gcRun=false;
+function begin(){ clearTimeout(veilScrollT); if(PROBE.phase==='over')restart(); PROBE.phase='run'; veil.style.display='none';
+  if(!_gcRun){ _gcRun=true; try{ window.goatcounter&&window.goatcounter.count({path:'partie',title:'Partie lancée',event:true}); }catch(_){} } }
 function restart(){
   PROBE=newState();
   buoyM.forEach((b,i)=>{b.visible=true;const L=PROBE.letters[i];b.position.set(L.x,heightAt(L.x,L.z)+3.2,L.z)});
@@ -1724,5 +1726,9 @@ window.KITELINE={
 };
 })();
 </script>
+<!-- Analytics sans cookie (GoatCounter). Pages vues automatiques ; l'event
+     "partie" est compté au premier lancement de run (voir begin()). -->
+<script data-goatcounter="https://kiteline.goatcounter.com/count"
+        async src="//gc.zgo.at/count.js"></script>
 </body>
 </html>
