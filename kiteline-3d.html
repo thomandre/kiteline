@@ -1453,9 +1453,10 @@ function frame(now){
   /* le rider se suspend à l'aile : gîte contre la traction, côté au vent.
      cos(cap) inverse le sens à chaque changement d'amure. */
   const lean=clamp((0.18+G.power*G.eff*0.5+G.load*0.55)*(G.air?0.35:1)*(G.edging?1.5:1),0,0.75)*Math.cos(G.heading);
-  /* la PLANCHE est sur la CARRE (edging) : jusqu'à ~20° quand on charge ; le reste
-     de la gîte va sur le CORPS (buste incliné contre la traction, plus bas). */
-  rider.rotation.z=G.crashT>0?Math.sin(G.t*20)*0.25:((G.kiteWet||G.sat>0)?0:lean*0.47);
+  /* CORPS ALIGNÉ : pieds, bassin et épaules basculent d'un seul bloc contre l'aile
+     (le buste n'ajoute plus de gîte). On penche donc un peu plus fort ici pour garder
+     l'appui contre la traction tout en gardant la ligne droite. */
+  rider.rotation.z=G.crashT>0?Math.sin(G.t*20)*0.25:((G.kiteWet||G.sat>0)?0:lean*0.6);
   rider.position.y=G.crashT>0?-0.25:(G.sat>0?-0.75:(G.kiteWet?-0.3:0));
   /* cheveux de surfer : soulevés/tirés vers l'arrière par le vent apparent,
      chaque mèche ondule et fouette (plus la vitesse est haute, plus ça vole). */
@@ -1515,21 +1516,16 @@ function frame(now){
     barMesh.position.y+=((1.48-UPIV[1]-trimIn*0.05)-barMesh.position.y)*pk;
     barMesh.rotation.z+=(barRoll-barMesh.rotation.z)*pk;
   }
-  /* stance de kite : le buste se tourne de profil vers l'aile (côté du vent, +X)
-     pendant qu'on navigue ; neutre en l'air pour des rotations propres. */
+  /* stance de kite ALIGNÉE : pieds → bassin → épaules forment UNE seule ligne. La
+     gîte contre l'aile est portée par `rider.rotation.z` (tout le corps bascule d'un
+     bloc) ; le buste NE s'incline donc PAS en plus par-dessus (sinon il se voûte et
+     le bassin sort de l'axe des pieds). On garde juste un léger regard vers l'aile. */
   {
     let face=Math.PI/2-G.heading; face=((face+Math.PI)%TAU+TAU)%TAU-Math.PI;
-    const target=(G.air||G.crashT>0||G.sat>0)?0:clamp(face,-1.0,1.0)*0.7;
+    const target=(G.air||G.crashT>0||G.sat>0)?0:clamp(face,-1.0,1.0)*0.32;   // épaules quasi dans l'axe des pieds
     upperGrp.rotation.y+=(target-upperGrp.rotation.y)*pk*0.6;
-    /* le buste encaisse l'essentiel de la gîte (corps suspendu à l'aile) pendant que
-       la planche reste à plat sur l'eau. */
-    const bodyLean=(G.air||G.crashT>0||G.sat>0)?0:lean*0.6;
-    upperGrp.rotation.z+=(bodyLean-upperGrp.rotation.z)*pk*0.6;
-    /* ÉPAULES EN ARRIÈRE / HANCHES EN AVANT : sous la traction, le rider se suspend
-       à l'aile — buste basculé vers l'arrière (pivot aux hanches → le bassin part en
-       avant vers la barre, poids sur les talons). Croît avec la charge et l'edging. */
-    const backLean=(G.air||G.crashT>0||G.sat>0)?0:clamp(0.09+G.load*0.32+(G.edging?0.12:0),0,0.34);
-    upperGrp.rotation.x+=(-backLean-upperGrp.rotation.x)*pk*0.6;
+    upperGrp.rotation.z+=(0-upperGrp.rotation.z)*pk*0.6;   // buste aligné sur le bassin (pas de gîte en plus)
+    upperGrp.rotation.x+=(0-upperGrp.rotation.x)*pk*0.6;   // ni bascule avant/arrière
   }
 
   /* ombre portée */
