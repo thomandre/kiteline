@@ -59,9 +59,13 @@ button.on{background:#2ED3E6;border-color:#F7FBFF;color:#0B3C5D;border-bottom-wi
    (jamais hors écran). Gauche = cap/aile, droite = tricks. */
 @media (orientation:landscape) and (max-height:560px){
   #keys{display:none}
-  #stage{width:100vw;height:100vh}
-  #stage>canvas{width:100vw!important;height:100vh!important}
-  #pad{position:fixed;inset:0;z-index:5;width:100vw;height:100vh;max-width:none;
+  /* dvh (dynamic viewport height) : suit la zone réellement visible. En navigateur
+     la barre d'outils réduit le viewport ; avec 100vh les contrôles ancrés en bas
+     passaient DERRIÈRE la barre (intappables) — OK en PWA (pas de barre), KO sur le
+     site. 100dvh replie sur 100vh pour les vieux moteurs. */
+  #stage{width:100vw;height:100vh;height:100dvh}
+  #stage>canvas{width:100vw!important;height:100vh!important;height:100dvh!important}
+  #pad{position:fixed;top:0;left:0;z-index:5;width:100vw;height:100vh;height:100dvh;max-width:none;
        margin:0;padding:0;background:none;pointer-events:none;display:block}
   #dpad,#acts{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);
        pointer-events:auto;background:rgba(11,44,66,.28);border-radius:12px;padding:5px;
