@@ -896,8 +896,10 @@ const RIG={
   footHalfW:0.13,   // demi-longueur du pied (en travers de la planche)
   footOffX:0.07,    // le pied est DÉCALÉ vers les orteils : la cheville est au talon → forme en L
   pelvis:[0,1.05,0.02],
-  hipF:[0.09,1.0,0.06],  kneeF:[0.15,0.55,0.28],  footF:[0,0.15,0.40],   // footF = la CHEVILLE
-  hipB:[-0.09,1.0,-0.02], kneeB:[-0.05,0.55,-0.28], footB:[0,0.15,-0.40]
+  // stance de charge : jambe AVANT plus tendue (genou haut), jambe ARRIÈRE fléchie
+  // et chargée (genou bas + avancé sur les orteils) → le poids porte sur l'arrière.
+  hipF:[0.09,1.0,0.06],  kneeF:[0.12,0.60,0.30],  footF:[0,0.15,0.40],   // footF = la CHEVILLE
+  hipB:[-0.09,1.0,-0.02], kneeB:[-0.02,0.48,-0.18], footB:[0,0.15,-0.40]
 };
 
 /* --- rider : silhouette athlétique dessinée, stance surf, cheveux au vent.
@@ -1523,6 +1525,11 @@ function frame(now){
        la planche reste à plat sur l'eau. */
     const bodyLean=(G.air||G.crashT>0||G.sat>0)?0:lean*0.6;
     upperGrp.rotation.z+=(bodyLean-upperGrp.rotation.z)*pk*0.6;
+    /* ÉPAULES EN ARRIÈRE / HANCHES EN AVANT : sous la traction, le rider se suspend
+       à l'aile — buste basculé vers l'arrière (pivot aux hanches → le bassin part en
+       avant vers la barre, poids sur les talons). Croît avec la charge et l'edging. */
+    const backLean=(G.air||G.crashT>0||G.sat>0)?0:clamp(0.09+G.load*0.32+(G.edging?0.12:0),0,0.34);
+    upperGrp.rotation.x+=(-backLean-upperGrp.rotation.x)*pk*0.6;
   }
 
   /* ombre portée */
