@@ -55,7 +55,14 @@ button.on{background:#2ED3E6;border-color:#F7FBFF;color:#0B3C5D;border-bottom-wi
 /* desktop (large ET haut) : pas de pad tactile. Un tel critère laisse le pad sur les
    téléphones paysage (larges mais bas). */
 @media(min-width:760px) and (min-height:600px){#pad{display:none}}
-@media(max-width:759px){#keys{display:none}}   /* légende clavier inutile sur mobile */
+/* mobile portrait : pas de légende clavier, et des touches bien plus grandes
+   (zones tactiles confortables au pouce). */
+@media(max-width:759px){
+  #keys{display:none}
+  #pad{gap:8px;padding:8px 10px}
+  .grp{gap:8px}
+  #pad button{min-height:58px;font-size:12px;padding:8px 3px}
+}
 /* PAYSAGE MOBILE : jeu plein écran, contrôles compacts ancrés dans les coins bas
    (jamais hors écran). Gauche = cap/aile, droite = tricks. */
 @media (orientation:landscape) and (max-height:560px){
@@ -68,13 +75,13 @@ button.on{background:#2ED3E6;border-color:#F7FBFF;color:#0B3C5D;border-bottom-wi
   #stage>canvas{width:100vw!important;height:100vh!important;height:100dvh!important}
   #pad{position:fixed;top:0;left:0;z-index:5;width:100vw;height:100vh;height:100dvh;max-width:none;
        margin:0;padding:0;background:none;pointer-events:none;display:block}
-  #dpad,#acts{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);
-       pointer-events:auto;background:rgba(11,44,66,.28);border-radius:12px;padding:5px;
-       display:grid;gap:5px;backdrop-filter:blur(2px)}
-  #dpad{left:calc(env(safe-area-inset-left,0px) + 8px);grid-template-columns:repeat(2,46px);grid-auto-rows:40px;grid-template-rows:none}
-  #acts{right:calc(env(safe-area-inset-right,0px) + 8px);grid-template-columns:repeat(3,46px);grid-auto-rows:36px;grid-template-rows:none}
+  #dpad,#acts{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 10px);
+       pointer-events:auto;background:rgba(11,44,66,.28);border-radius:14px;padding:8px;
+       display:grid;gap:8px;backdrop-filter:blur(2px)}
+  #dpad{left:calc(env(safe-area-inset-left,0px) + 10px);grid-template-columns:repeat(2,68px);grid-auto-rows:60px;grid-template-rows:none}
+  #acts{right:calc(env(safe-area-inset-right,0px) + 10px);grid-template-columns:repeat(3,64px);grid-auto-rows:54px;grid-template-rows:none}
   #acts #bEdge{grid-column:1/-1}
-  #pad button{min-height:0;font-size:9px;padding:2px 1px}
+  #pad button{min-height:0;font-size:11px;padding:2px 1px}
 }
 </style>
 </head>
