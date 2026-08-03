@@ -273,6 +273,65 @@ describe('gameplay', () => {
     });
   });
 
+  it('un trick réceptionné crédite le score après le combo', () => {
+    cy.window().then(w => {
+      const K = w.KITELINE, G = K.G;
+      G.heading = 0; G.speed = 18;
+      G.air = true; G.y = 0.1; G.vy = -2; G.airT = 1.0; G.spin = 360; G.kite = 60; G.maxH = 4;
+      K.step(0.05);                       // réception → land() enregistre le trick
+      expect(G.air, 'réceptionné').to.eq(false);
+      expect(G.pot, 'pot accumulé').to.be.greaterThan(0);
+      expect(G.mult, 'multiplicateur').to.be.greaterThan(0);
+      const before = G.score;
+      for (let i = 0; i < 60; i++) K.step(0.05);   // le combo se banke au sol
+      expect(G.mult, 'combo banké').to.eq(0);
+      expect(G.score, 'score crédité').to.be.greaterThan(before);
+    });
+  });
+
+  it('parcours réel avec inputs : charger, décoller, spin, réceptionner, scorer', () => {
+    cy.window().then(w => {
+      const K = w.KITELINE, G = K.G;
+      G.heading = 0; G.speed = 20; G.kite = 60;
+      K.setK('edge', 1);
+      for (let i = 0; i < 18; i++) K.step(0.05);       // charger la carre
+      K.setK('kup', 1);
+      for (let i = 0; i < 5; i++) K.step(0.05);         // envoyer l'aile
+      K.setK('kup', 0);
+      K.setK('edge', 0);
+      for (let i = 0; i < 3; i++) K.step(0.02);         // relâcher → pop (modéré)
+      expect(G.air, 'décollé').to.eq(true);
+      K.setK('spin', 1);
+      for (let i = 0; i < 8 && G.air; i++) K.step(0.05);    // 360 en l'air
+      K.setK('spin', 0);
+      for (let i = 0; i < 300 && G.air; i++) K.step(0.05);  // retomber + réceptionner
+      expect(G.air, 'réceptionné').to.eq(false);
+      for (let i = 0; i < 60; i++) K.step(0.05);            // banker le combo
+      ['edge', 'kup', 'spin'].forEach(k => K.setK(k, 0));
+      expect(G.score, 'score crédité en jeu réel').to.be.greaterThan(0);
+    });
+  });
+
+  it('le combo se banke même si on carve après (score pas bloqué)', () => {
+    cy.window().then(w => {
+      const K = w.KITELINE, G = K.G;
+      G.heading = 0; G.speed = 18;
+      G.air = true; G.y = 0.1; G.vy = -2; G.airT = 1.0; G.spin = 360; G.kite = 60; G.maxH = 4;
+      K.step(0.05);                        // réception → trick
+      expect(G.mult, 'trick enregistré').to.be.greaterThan(0);
+      const before = G.score;
+      K.setK('edge', 1);                   // le joueur carve juste après avoir posé
+      for (let i = 0; i < 60; i++) K.step(0.05);   // 3 s de carving
+      K.setK('edge', 0);
+      expect(G.score, 'score banké malgré le carving continu').to.be.greaterThan(before);
+    });
+  });
+
+  it('le HUD affiche le score courant', () => {
+    cy.window().then(w => { w.KITELINE.G.score = 12345; });
+    cy.get('#hScore b').should('contain', '12');
+  });
+
   it('le chrono termine la partie', () => {
     cy.window().then(w => {
       const G = w.KITELINE.G;

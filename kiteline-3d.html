@@ -31,7 +31,8 @@ body{background:#0B3C5D;color:#F7FBFF;font-family:ui-monospace,"SF Mono",Menlo,C
 #loopB{width:12.5cqw;height:.9cqw;background:#0B3C5D;margin-top:.5cqw;border:1px solid #7a2a55;margin-left:auto}
 #loopF{height:100%;width:0;background:#FF4FA3}
 #veil{position:absolute;inset:0;background:#0B3C5Dee;display:flex;flex-direction:column;
- align-items:center;justify-content:center;text-align:center;gap:.9cqw;padding:16px;pointer-events:auto}
+ align-items:center;justify-content:safe center;text-align:center;gap:.9cqw;padding:16px;
+ pointer-events:auto;overflow-y:auto;-webkit-overflow-scrolling:touch}
 #veil h1{font-size:clamp(18px,3.8cqw,46px);letter-spacing:.42em;color:#FFD400;font-weight:700}
 #veil p{font-size:clamp(9px,1.7cqw,20px);opacity:.85;max-width:72cqw;line-height:1.8}
 #veil .go{color:#FF4FA3;font-size:clamp(10px,1.9cqw,22px);letter-spacing:.2em;margin-top:1.4cqw;animation:bl 1s steps(2) infinite}
@@ -54,17 +55,21 @@ button.on{background:#2ED3E6;border-color:#F7FBFF;color:#0B3C5D;border-bottom-wi
    téléphones paysage (larges mais bas). */
 @media(min-width:760px) and (min-height:600px){#pad{display:none}}
 @media(max-width:759px){#keys{display:none}}   /* légende clavier inutile sur mobile */
-/* PAYSAGE MOBILE : jeu plein écran, contrôles collés à gauche et à droite */
+/* PAYSAGE MOBILE : jeu plein écran, contrôles compacts ancrés dans les coins bas
+   (jamais hors écran). Gauche = cap/aile, droite = tricks. */
 @media (orientation:landscape) and (max-height:560px){
   #keys{display:none}
   #stage{width:100vw;height:100vh}
   #stage>canvas{width:100vw!important;height:100vh!important}
   #pad{position:fixed;inset:0;z-index:5;width:100vw;height:100vh;max-width:none;
-       padding:0;background:none;pointer-events:none;
-       display:flex;justify-content:space-between;align-items:flex-end}
-  #dpad,#acts{pointer-events:auto;width:29vw;max-width:210px;margin:0 2vw 3vh;
-       background:rgba(11,44,66,.22);border-radius:14px;padding:7px;backdrop-filter:blur(2px)}
-  #pad button{min-height:34px}
+       margin:0;padding:0;background:none;pointer-events:none;display:block}
+  #dpad,#acts{position:absolute;bottom:calc(env(safe-area-inset-bottom,0px) + 8px);
+       pointer-events:auto;background:rgba(11,44,66,.28);border-radius:12px;padding:5px;
+       display:grid;gap:5px;backdrop-filter:blur(2px)}
+  #dpad{left:calc(env(safe-area-inset-left,0px) + 8px);grid-template-columns:repeat(2,46px);grid-auto-rows:40px;grid-template-rows:none}
+  #acts{right:calc(env(safe-area-inset-right,0px) + 8px);grid-template-columns:repeat(3,46px);grid-auto-rows:36px;grid-template-rows:none}
+  #acts #bEdge{grid-column:1/-1}
+  #pad button{min-height:0;font-size:9px;padding:2px 1px}
 }
 </style>
 </head>
@@ -100,7 +105,7 @@ button.on{background:#2ED3E6;border-color:#F7FBFF;color:#0B3C5D;border-bottom-wi
   </div>
   <div class="grp" id="acts">
     <button data-k="spin">Spin</button><button data-k="roll">Roll</button><button data-k="grab">Grab</button>
-    <button id="bEdge" data-k="edge">Carre — relâcher pour décoller</button>
+    <button id="bEdge" data-k="edge">Carre</button>
     <button data-k="pass">Pass</button><button id="bLoop" data-k="loop">Loop</button>
   </div>
 </div>
@@ -437,7 +442,10 @@ function step(G,K,PRESS,dt){
 
   /* --- combo --- */
   if(G.mult>0){
-    if(G.air||G.edging||G.grinding) G.comboT=Math.max(G.comboT,0.9);
+    /* seuls le vol et le grind gardent le combo ouvert ; le carving NE bloque PLUS
+       le combo (sinon le score restait coincé tant qu'on tenait la carre). On garde
+       ~1,5 s pour ré-enchaîner un saut, sinon le score est banké. */
+    if(G.air||G.grinding) G.comboT=Math.max(G.comboT,0.9);
     else G.comboT-=dt;
     if(G.comboT<=0) bank(G);
   }
@@ -1279,7 +1287,24 @@ document.getElementById('veil').addEventListener('pointerdown',e=>{e.preventDefa
 
 /* ================= BOUCLE ================= */
 const veil=document.getElementById('veil');
-function begin(){ if(PROBE.phase==='over')restart(); PROBE.phase='run'; veil.style.display='none'; }
+/* si le texte du veil déborde (petit écran), on l'auto-scrolle après 2 s pour qu'il
+   soit lisible en entier au lieu d'être tronqué. */
+let veilScrollT=null;
+function veilAutoScroll(){
+  clearTimeout(veilScrollT); veil.scrollTop=0;
+  veilScrollT=setTimeout(()=>{
+    const max=veil.scrollHeight-veil.clientHeight;
+    if(max<=4||veil.style.display==='none') return;
+    const t0=performance.now(), dur=Math.min(7000,1600+max*10);
+    (function loop(t){
+      if(veil.style.display==='none') return;
+      const k=Math.min(1,(t-t0)/dur);
+      veil.scrollTop=max*(k<0.5?2*k*k:1-Math.pow(-2*k+2,2)/2);   // ease in-out
+      if(k<1) requestAnimationFrame(loop);
+    })(performance.now());
+  },2000);
+}
+function begin(){ clearTimeout(veilScrollT); if(PROBE.phase==='over')restart(); PROBE.phase='run'; veil.style.display='none'; }
 function restart(){
   PROBE=newState();
   buoyM.forEach((b,i)=>{b.visible=true;const L=PROBE.letters[i];b.position.set(L.x,heightAt(L.x,L.z)+3.2,L.z)});
@@ -1416,10 +1441,12 @@ function frame(now){
   {
     const active=G.crashT<=0&&!G.sat&&!G.kiteWet;
     const trimIn=clamp(G.load*0.5+(KEYS.kup?0.3:0),0,0.85);
-    const barZ=active?0.5-trimIn*0.13:0.5;
+    /* la barre est enfant de upperGrp (recentré sur les hanches) → ses cibles sont
+       en repère décalé de -UPIV, sinon elle remonte hors de portée des bras. */
+    const barZ=(active?0.5-trimIn*0.13:0.5)-UPIV[2];
     const barRoll=active?kv*0.4:0;
     barMesh.position.z+=(barZ-barMesh.position.z)*pk;
-    barMesh.position.y+=((1.48-trimIn*0.05)-barMesh.position.y)*pk;
+    barMesh.position.y+=((1.48-UPIV[1]-trimIn*0.05)-barMesh.position.y)*pk;
     barMesh.rotation.z+=(barRoll-barMesh.rotation.z)*pk;
   }
   /* stance de kite : le buste se tourne de profil vers l'aile (côté du vent, +X)
@@ -1637,7 +1664,7 @@ function hud(G){
         ['2,2 s en l\'air',g.air],['remonter tout au vent',g.upwind]]
         .map(r=>(r[1]?'<span style="color:#FFD400">☑ ':'<span style="color:#4a6b7e">☐ ')+r[0]+'</span>').join('<br>')
       +'</p><div class="go">TOUCHE POUR REJOUER</div>';
-    veil.style.display='flex';
+    veil.style.display='flex'; veilAutoScroll();
     veil.addEventListener('pointerdown',e=>{e.preventDefault();restart()},{once:true});
   }
 }
@@ -1660,6 +1687,7 @@ function fit(){
 }
 addEventListener('orientationchange',()=>setTimeout(fit,100));
 addEventListener('resize',fit); fit();
+veilAutoScroll();   // écran d'accueil : auto-scroll si le texte déborde
 requestAnimationFrame(frame);
 
 /* ================= API DE TEST (Cypress) ================= */
