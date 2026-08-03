@@ -1,0 +1,1644 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>KITELINE 3D</title>
+<style>
+/* Palette : rose #FF4FA3 · jaune #FFD400 · lagon #2ED3E6 · océan #0B3C5D
+   écume #F7FBFF · anthracite #2B2F36 · sable #E9D8B4 */
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{background:#0B3C5D;color:#F7FBFF;font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+ display:flex;flex-direction:column;align-items:center;touch-action:none;user-select:none}
+#stage{position:relative;width:100%;background:#000;flex:0 0 auto;container-type:inline-size}
+#stage>canvas{display:block;width:100%;height:auto}
+#hud{position:absolute;inset:0;pointer-events:none;font-size:clamp(9px,1.9cqw,22px);line-height:1.35;letter-spacing:.06em}
+.h{position:absolute;text-shadow:1px 1px 0 #0b3c5daa}
+#hScore{top:1cqw;left:1.4cqw}
+#hScore b{font-size:clamp(14px,3.2cqw,38px);font-weight:700;display:block;letter-spacing:.02em}
+#hScore span{font-size:clamp(7px,1.4cqw,16px);opacity:.7;letter-spacing:.22em;color:#2ED3E6}
+#hCombo{top:8.8cqw;left:1.4cqw;color:#FFD400;font-size:clamp(11px,2.4cqw,28px);font-weight:700}
+#hTime{top:1cqw;right:1.4cqw;font-size:clamp(14px,3.2cqw,38px);font-weight:700}
+#hLet{top:5.6cqw;right:1.4cqw;letter-spacing:.34em;font-size:clamp(10px,2.2cqw,26px);font-weight:700}
+#mini{top:9.6cqw;right:1.4cqw;width:14cqw;height:14cqw;border:1px solid #2ED3E6;opacity:.92;image-rendering:pixelated}
+#hTrick{bottom:5.8cqw;left:1.4cqw;color:#F7FBFF;font-size:clamp(10px,2cqw,24px)}
+#hBanner{top:38%;width:100%;text-align:center;color:#FF4FA3;font-size:clamp(12px,2.6cqw,32px);font-weight:700}
+#hAir{top:47%;width:100%;text-align:center;color:#FFD400;font-size:clamp(13px,3cqw,38px);font-weight:700;letter-spacing:.12em}
+#hWind{bottom:1cqw;left:1.4cqw;font-size:clamp(7px,1.4cqw,16px);letter-spacing:.18em;opacity:.9}
+#rose{display:block;width:11cqw;height:11cqw;margin-top:.5cqw;image-rendering:pixelated}
+#hLoop{bottom:1cqw;right:1.4cqw;font-size:clamp(7px,1.4cqw,16px);letter-spacing:.18em;text-align:right}
+#loopB{width:12.5cqw;height:.9cqw;background:#0B3C5D;margin-top:.5cqw;border:1px solid #7a2a55;margin-left:auto}
+#loopF{height:100%;width:0;background:#FF4FA3}
+#veil{position:absolute;inset:0;background:#0B3C5Dee;display:flex;flex-direction:column;
+ align-items:center;justify-content:center;text-align:center;gap:.9cqw;padding:16px;pointer-events:auto}
+#veil h1{font-size:clamp(18px,3.8cqw,46px);letter-spacing:.42em;color:#FFD400;font-weight:700}
+#veil p{font-size:clamp(9px,1.7cqw,20px);opacity:.85;max-width:72cqw;line-height:1.8}
+#veil .go{color:#FF4FA3;font-size:clamp(10px,1.9cqw,22px);letter-spacing:.2em;margin-top:1.4cqw;animation:bl 1s steps(2) infinite}
+@keyframes bl{50%{opacity:.15}}
+#pad{flex:1 1 auto;width:100%;max-width:600px;display:grid;grid-template-columns:1fr 1.5fr;gap:9px;padding:10px}
+.grp{display:grid;gap:6px}
+#dpad{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}
+#acts{grid-template-columns:1fr 1fr 1fr;grid-template-rows:auto 1fr}
+button{font-family:inherit;font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+ color:#F7FBFF;background:#2B2F36;border:1px solid #2ED3E6;border-bottom-width:3px;border-radius:3px;
+ padding:12px 2px;min-height:42px}
+button.on{background:#2ED3E6;border-color:#F7FBFF;color:#0B3C5D;border-bottom-width:1px;transform:translateY(1px)}
+#bEdge{grid-column:1/-1;background:#0B3C5D;border-color:#FFD400;color:#FFD400}
+#bEdge.on{background:#FFD400;color:#0B3C5D}
+#bLoop{color:#FF4FA3;background:#2B2F36;border-color:#7a2a55}
+#bLoop.rdy{background:#FF4FA3;border-color:#F7FBFF;color:#fff}
+#keys{font-size:8px;opacity:.45;padding:4px 10px 8px;text-align:center;letter-spacing:.08em}
+@media(min-width:760px){#pad{display:none}}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="hud">
+    <div class="h" id="hScore"><span>SCORE</span><b>0</b></div>
+    <div class="h" id="hCombo"></div>
+    <div class="h" id="hTime">3:00</div>
+    <div class="h" id="hLet"></div>
+    <canvas class="h" id="mini" width="84" height="84"></canvas>
+    <div class="h" id="hTrick"></div>
+    <div class="h" id="hBanner"></div>
+    <div class="h" id="hAir"></div>
+    <div class="h" id="hWind">CAP <i id="pa">--</i>° DU VENT<canvas id="rose" width="64" height="64"></canvas></div>
+    <div class="h" id="hLoop">LOOP<div id="loopB"><div id="loopF"></div></div></div>
+  </div>
+  <div id="veil">
+    <h1>KITELINE</h1>
+    <p>Le vent souffle vers la droite. Tu glisses sur tous les caps — le largue est le plus rapide — mais jamais face au vent.</p>
+    <p>L'aile n'est jamais stable : elle monte et descend au gré des risées — corrige sans cesse sa hauteur avec ▲▼. En l'air, grab + une direction choisit ta prise (grab seul Indy, ▼ Melon, ▲ Stalefish, ◀ Nuclear, ▶ Slob, Pass Tail Grab) — chaque prise a sa pose, et tu peux les enchaîner.</p>
+    <p>Carre pour charger les lignes, envoie l'aile au zénith, relâche pour décoller — et garde-la haute en vol pour planer loin. Ramène-la dans la fenêtre avant de te poser, sinon c'est la chute.</p>
+    <p>Si tu laisses l'aile plonger au bord de la fenêtre, elle tombe à l'eau : maintiens ▲ pour la relancer pendant que tu dérives sous le vent.</p>
+    <p>L'eau blanche casse : saute par-dessus les bancs de sable et évite la plage — seul le ponton se glisse.</p>
+    <p>Si tu cales face au vent, tu t'assois dans l'eau : pique l'aile (▼) dans la zone de puissance et abats pour te faire tracter dehors.</p>
+    <div class="go">TOUCHE OU CLIC POUR PARTIR</div>
+  </div>
+</div>
+<div id="pad">
+  <div class="grp" id="dpad">
+    <button data-k="left">◀</button><button data-k="right">▶</button>
+    <button data-k="kup">▲ aile</button><button data-k="kdown">▼ aile</button>
+  </div>
+  <div class="grp" id="acts">
+    <button data-k="spin">Spin</button><button data-k="roll">Roll</button><button data-k="grab">Grab</button>
+    <button id="bEdge" data-k="edge">Carre — relâcher pour décoller</button>
+    <button data-k="pass">Pass</button><button id="bLoop" data-k="loop">Loop</button>
+  </div>
+</div>
+<div id="keys">← → cap · ↑ ↓ aile (↑ relance l'aile tombée) · Q spin · S roll · D grab · F pass · ESPACE carre · MAJ loop · R restart</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function(){
+"use strict";
+if(typeof THREE==='undefined'){
+  document.getElementById('veil').innerHTML='<h1>HORS LIGNE</h1><p>three.js n\'a pas pu être chargé depuis le CDN. Recharge la page avec une connexion active.</p>';
+  return;
+}
+
+/* ================= NOYAU PHYSIQUE (testable sans THREE) ================= */
+const TAU = Math.PI*2;
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+const MAXSPD=30, GRAV=26, WORLD=270;
+
+/* --- le spot : tout est analytique, le maillage est échantillonné dessus --- */
+const FEAT = [
+  {t:'ridge', z:-160, h:4.2, w:6,   x0:-270, x1:270},   // le grand banc de sable extérieur
+  {t:'ridge', z: -60, h:2.8, w:4.5, x0:-240, x1:120},   // le banc intermédiaire
+  {t:'ridge', z:  70, h:2.2, w:4,   x0:-140, x1:250},   // shorebreak
+  {t:'kick',  x:-120, z:-20,  h:3.4, r:8},
+  {t:'kick',  x:-40,  z:-100, h:3.0, r:7},
+  {t:'kick',  x: 30,  z:-30,  h:2.8, r:6},
+  {t:'kick',  x: 90,  z: 120, h:4.6, r:9},              // l'épave
+  {t:'kick',  x:-190, z: 90,  h:3.8, r:8},
+  {t:'kick',  x: 170, z: 150, h:7,   r:30},             // l'île
+  {t:'kick',  x: 170, z: 150, h:3.4, r:52},             // son socle : grande plage + lagon
+  {t:'pier',  x0:60, x1:67, z0:-140, z1:40, h:2.8}      // le ponton : le rail
+];
+const PIER=FEAT.find(f=>f.t==='pier');
+
+function staticH(x,z,skipPier){
+  let y=0;
+  for(const f of FEAT){
+    if(f.t==='pier'&&skipPier) continue;
+    if(f.t==='ridge'){
+      if(x<f.x0-4||x>f.x1+4) continue;
+      const d=(z-f.z)/f.w;
+      if(d>-3&&d<3){
+        let e=Math.exp(-d*d);
+        const edge=Math.min(1,(x-f.x0)/10)*Math.min(1,(f.x1-x)/10);
+        y+=f.h*e*clamp(edge,0,1);
+      }
+    } else if(f.t==='kick'){
+      const dx=(x-f.x)/f.r, dz=(z-f.z)/f.r, d2=dx*dx+dz*dz;
+      if(d2<9) y+=f.h*Math.exp(-d2);
+    } else if(f.t==='pier'){
+      const inx=x>f.x0-1.5&&x<f.x1+1.5, inz=z>f.z0&&z<f.z1;
+      if(inx&&inz){
+        const ex=Math.min(x-(f.x0-1.5),(f.x1+1.5)-x);
+        y=Math.max(y, f.h*clamp(ex/1.5,0,1));
+      }
+    }
+  }
+  return y;
+}
+/* le fond marin sans le ponton : l'eau ne se bombe pas sous les pilotis */
+function seabedH(x,z){ return staticH(x,z,true); }
+/* houle animée : même formule côté physique (JS) et côté rendu (shader GPU) */
+let WTIME=0;
+function swell(x,z){
+  return 0.6*Math.sin(x*0.05-0.85*WTIME)
+       +0.35*Math.sin(z*0.075+0.65*WTIME)
+       +0.22*Math.sin((x+z)*0.13-1.3*WTIME);
+}
+function heightAt(x,z){ return staticH(x,z)+swell(x,z); }
+function onPier(x,z){
+  return x>PIER.x0-1.2&&x<PIER.x1+1.2&&z>PIER.z0&&z<PIER.z1;
+}
+
+/* --- vent : souffle vers +X. Le cap décide de tout. --- */
+const WIND={x:1,z:0};
+/* pointAngle : 0 = plein vent arrière, 180 = plein vent debout */
+function pointAngle(heading){
+  const fx=Math.sin(heading), fz=Math.cos(heading);
+  const dot=clamp(fx*WIND.x+fz*WIND.z,-1,1);
+  return Math.acos(dot)*180/Math.PI;
+}
+/* rendement : le vent apparent porte l'aile sur tous les caps portants.
+   ~70 % plein vent arrière (le downwinder marche fort), max au largue (~65°
+   du lit), puis ça s'effondre en remontant : nul à 140° — 160° en carre,
+   c'est comme ça qu'on gagne au vent. */
+function pointEff(heading, edging){
+  const p=pointAngle(heading);
+  const lim=edging?160:140, PK=65;
+  if(p>=lim) return 0;
+  if(p<=PK) return 0.7+0.3*Math.sin(Math.PI/2*p/PK);
+  return Math.cos(Math.PI/2*(p-PK)/(lim-PK));
+}
+function powerAt(a){ const t=(a-38)/70; return (t<-1||t>1)?0:Math.cos(t*Math.PI/2); }
+/* la portance culmine à 90° : aile au zénith = la base du saut */
+function liftAt(a){ const t=(a-90)/45; return (t<-1||t>1)?0:Math.cos(t*Math.PI/2); }
+/* l'aile n'est jamais stable : rafales déterministes (calmes puis soutenues)
+   qui font monter/descendre l'aile — au joueur de corriger sans cesse. */
+function kiteGust(t){
+  const env=clamp(0.4+0.6*Math.sin(t*0.19+0.5),0,1);            // enveloppe lente
+  const w=Math.sin(t*0.8)+0.6*Math.sin(t*1.9+1.3)+0.4*Math.sin(t*3.3+2.1);
+  return env*(w/2);   // ~ -1..1
+}
+
+const GRABS=['Melon','Indy','Stalefish','Nuclear','Tail Grab','Slob','Seatbelt'];
+/* pose propre à chaque grab pour les différencier À L'ŒIL — hand: main qui saisit,
+   ax/az: bras de saisie, tuck: pitch planche, tilt: carre (talon+ / orteils-),
+   yaw: lacet de la planche (met le tail/nose en avant). */
+const GRABPOSE={
+  'Indy':      {hand:'R', ax:1.25, az:-0.35, tuck:-1.15, tilt:-0.9,  yaw:0.0},
+  'Melon':     {hand:'L', ax:1.25, az:0.35,  tuck:-1.15, tilt:0.9,   yaw:0.0},
+  'Stalefish': {hand:'R', ax:1.5,  az:-0.6,  tuck:-1.35, tilt:0.95,  yaw:-0.28},
+  'Nuclear':   {hand:'L', ax:1.5,  az:0.6,   tuck:-1.3,  tilt:0.95,  yaw:0.28},
+  'Tail Grab': {hand:'R', ax:1.75, az:-0.1,  tuck:-0.55, tilt:-0.3,  yaw:-0.6},
+  'Slob':      {hand:'L', ax:1.35, az:0.25,  tuck:-1.1,  tilt:-0.9,  yaw:0.18},
+  'Seatbelt':  {hand:'R', ax:1.65, az:-1.05, tuck:-0.9,  tilt:0.35,  yaw:0.5}
+};
+const ROLLS={1:'Backroll',2:'Double Backroll',3:'Triple Backroll'};
+const SPINS={1:'180',2:'360',3:'540',4:'720',5:'900',6:'1080'};
+
+function newState(){
+  return {
+    t:0, time:180, phase:'title',
+    x:-80, z:0, y:0, vy:0, heading:0, speed:8, switchy:false,
+    kite:60, kiteVel:0, power:0, lift:0, eff:0, load:0, air:false, airT:0, wasEdge:false, edging:false,
+    spin:0, roll:0, grabT:0, grabHeld:false, grabName:'', grabsDone:[], passes:0, passCD:0,
+    takeoffHeading:0, grinding:false, grindT:0,
+    kiteWet:false, relaunch:0, stallT:0, crashT:0, splash:null, washX:null, washZ:null,
+    sat:0, satCD:0, satSplash:null,
+    score:0, pot:0, mult:0, comboT:0, special:0, loopT:0, loopBoost:0, best:0,
+    trick:'', trickT:0, banner:'', bannerT:0, bailT:0,
+    letters:[{x:-120,z:-26,c:'K'},{x:30,z:-36,c:'I'},{x:-40,z:-106,c:'T'},{x:90,z:114,c:'E'}].map(l=>({...l,got:false})),
+    got:{}, maxAir:0, maxH:0, goals:{score:0,letters:0,pier:0,air:0,upwind:0}
+  };
+}
+
+/* échoué : après la chute, on repart de l'AUTRE CÔTÉ du banc — on continue dans
+   la direction où on allait jusqu'à repasser en eau navigable (distance bornée). */
+function washOut(G){
+  const hx=Math.sin(G.heading), hz=Math.cos(G.heading);
+  for(let r=4;r<=80;r+=2){                        // traverse le banc/l'île dans l'axe du mouvement
+    const wx=G.x+hx*r, wz=G.z+hz*r;
+    if(staticH(wx,wz)<1.0){ G.washX=wx+hx*4; G.washZ=wz+hz*4; return; }
+  }
+  for(let r=6;r<=100;r+=4)                        // sinon l'eau navigable la plus proche
+    for(let a=0;a<TAU;a+=Math.PI/8){
+      const wx=G.x+Math.cos(a)*r, wz=G.z+Math.sin(a)*r;
+      if(staticH(wx,wz)<1.0){ G.washX=wx; G.washZ=wz; return; }
+    }
+  G.washX=G.x+hx*40; G.washZ=G.z+hz*40;
+}
+
+function kiteFall(G){
+  if(G.kiteWet) return;
+  G.kiteWet=true; G.relaunch=0; G.stallT=0; G.loopT=0; G.loopBoost=0;
+  G.pot=0; G.mult=0; G.comboT=0;
+  G.splash={x:G.x+12,y:0.2,z:G.z};
+  say(G,'AILE A L\'EAU');
+}
+
+function step(G,K,PRESS,dt){
+  G.t+=dt; WTIME=G.t;
+  if(G.phase!=='run') return;
+  G.time-=dt; if(G.time<=0){G.time=0;bank(G);G.phase='over';}
+  const locked=G.crashT>0;   // seul le wipeout dur fige tout ; assis = on peut steerer
+  const kite0=G.kite;        // pour mesurer la vitesse d'envoi de l'aile
+
+  /* --- aile --- */
+  if(G.kiteWet){
+    G.power=0; G.lift=0; G.eff=0; G.load=0;
+    if(K.kup) G.relaunch=Math.min(1,G.relaunch+dt/1.6);
+    else G.relaunch=Math.max(0,G.relaunch-0.7*dt);
+    if(G.relaunch>=1){
+      G.kiteWet=false; G.relaunch=0; G.kite=30; G.stallT=0; G.speed+=2.5;
+      say(G,'AILE RELANCEE',true);
+    } else if(G.bannerT<=0.15) say(G,'AILE A L\'EAU — ▲ POUR RELANCER');
+  } else {
+    if(G.loopT>0){
+      G.loopT-=dt;
+      const p=1-G.loopT;
+      G.kite = 90-88*Math.sin(Math.min(1,p*1.7)*Math.PI*0.5)+(p>0.6?(p-0.6)*250:0);
+      if(G.loopT<=0) G.kite=clamp(G.kite,25,150);
+    } else {
+      if(K.kup) G.kite+=78*dt;
+      else if(K.kdown) G.kite-=78*dt;
+      else if(!G.air&&!G.sat) G.kite+=(kiteGust(G.t)*14+(58-G.kite)*0.6)*dt;  // aile instable au sol
+      else G.kite+=Math.sign(58-G.kite)*Math.min(11*dt,Math.abs(58-G.kite));   // en l'air : neutre stable
+      G.kite=clamp(G.kite,15,165);
+    }
+    G.power=powerAt(G.kite); G.lift=liftAt(G.kite);
+    G.kiteVel=(G.kite-kite0)/Math.max(dt,1e-4);   // vitesse d'envoi (°/s)
+
+    if(PRESS.loop&&G.special>=100&&G.loopT<=0){
+      G.special=0; G.loopT=1; G.loopBoost=1; G.speed+=9;
+      if(G.air) G.vy-=8; say(G,'KITE LOOP',true);
+    }
+    /* décrochage : l'aile plantée en bord de fenêtre finit à l'eau
+       (pas pendant un redémarrage assis : là on pique l'aile volontairement) */
+    if(!G.air&&G.loopT<=0&&G.kite<=17&&!K.kup&&G.sat<=0){
+      G.stallT+=dt;
+      if(G.stallT>0.55) kiteFall(G);
+    } else G.stallT=0;
+  }
+
+  /* --- direction ---
+     heading croissant tourne vers +X ; vu de la caméra de chasse c'est la
+     GAUCHE écran, donc ◀ incrémente et ▶ décrémente. */
+  const turn=(1.9-G.speed/MAXSPD*0.75)*(G.air?0.35:1);
+  if(!locked){
+    if(K.left)  G.heading+=turn*dt;
+    if(K.right) G.heading-=turn*dt;
+  }
+  G.heading=(G.heading+TAU)%TAU;
+
+  /* --- propulsion : puissance d'aile × rendement de cap --- */
+  if(G.kiteWet||locked){
+    G.edging=false;
+    G.speed+=((locked?1.6:1.0)-G.speed)*1.8*dt;
+    if(G.speed<0.5) G.speed=0.5;
+    if(G.kiteWet&&!G.air) G.x+=WIND.x*1.6*dt;   // dérive sous le vent
+    /* pendant le wipeout on RESTE sur place (le rider se fait mal, on voit la
+       chute) — le déplacement vers l'eau se fait à la fin de l'animation. */
+  } else if(G.sat>0){
+    /* assis face au vent : SEULE la traction de l'aile piquée dans la zone de
+       puissance (↓) te ressort de l'eau — il faut steerer l'aile, et abattre. */
+    G.edging=false;
+    G.eff=pointEff(G.heading,false);
+    const dive=K.kdown?1.0:(G.kite<50?0.35:0.0);   // piquer l'aile = gros pull
+    G.speed+=G.power*dive*8*dt-1.6*dt;             // sinon on retombe au ralenti
+    G.speed=clamp(G.speed,0.8,MAXSPD);
+    if(G.bannerT<=0.15) say(G,'FACE AU VENT — PIQUE L\'AILE ↓');
+    if(G.speed>5.5){ G.sat=0; G.satCD=1.2; G.load=0; say(G,'REDÉMARRAGE',true); }
+  } else {
+    G.edging=!!K.edge&&!G.air;
+    G.eff=pointEff(G.heading,G.edging);
+    const target=2+G.power*G.eff*MAXSPD+(G.loopT>0?9:0);
+    G.speed+=(target-G.speed)*1.5*dt;
+
+    if(G.edging){
+      G.load=Math.min(1.25,G.load+(0.5+G.power*0.9)*(0.35+G.speed/MAXSPD)*1.15*dt);
+      G.speed-=(3.2+G.load*3.6)*dt;
+    } else if(!G.air){ G.load=Math.max(0,G.load-2.6*dt); }
+    G.speed=Math.max(1.5,G.speed);
+
+    /* --- pop --- */
+    if(G.wasEdge&&!K.edge&&!G.air){
+      const dx=Math.sin(G.heading)*1.4, dz=Math.cos(G.heading)*1.4;
+      const slope=(heightAt(G.x+dx,G.z+dz)-heightAt(G.x-dx,G.z-dz))/2.8;
+      const ramp=clamp(slope,0,1.4);
+      if(G.load>0.12||ramp>0.25){
+        /* la GROSSE portance n'arrive que si l'aile est ENVOYÉE vers le haut au
+           bon instant : send = vitesse d'envoi (↑) × présence dans la zone de lift.
+           Parker l'aile au zénith (immobile) ne suffit plus — c'est un question de timing. */
+        /* juste milieu : l'aile haute (lift) donne déjà un saut MOYEN ; l'ENVOYER
+           vers le haut au bon instant (send) le transforme en gros air. */
+        const send=clamp(G.kiteVel/70,0,1);
+        const lf=G.lift;
+        G.vy=3.0+G.load*4.6+G.load*lf*(3.5+7.5*send)+lf*(1.4+2.4*send)+ramp*6.2;
+        G.air=true; G.airT=0; G.maxH=0; G.spin=0; G.roll=0; G.grabT=0; G.passes=0;
+        G.takeoffHeading=G.heading; G.grinding=false;
+        G.grabName=''; G.grabsDone=[];
+      }
+      G.load=0;
+    }
+  }
+  G.wasEdge=!!K.edge;
+
+  /* --- déplacement --- */
+  G.x+=Math.sin(G.heading)*G.speed*dt;
+  G.z+=Math.cos(G.heading)*G.speed*dt;
+  /* pas de limites : la mer est infinie, on kite où on veut */
+
+  const ground=heightAt(G.x,G.z);
+  if(G.air){
+    G.airT+=dt; G.maxAir=Math.max(G.maxAir,G.airT);
+    G.maxH=Math.max(G.maxH,G.y-ground);
+    /* hangtime : l'aile gardée haute te suspend et te tire sous le vent —
+       c'est ça, le big air */
+    const hang=G.kiteWet?0:G.lift;
+    G.vy-=GRAV*(1-0.5*hang)*dt;
+    G.x+=WIND.x*hang*3.5*dt;
+    G.y+=G.vy*dt;
+    if(K.spin) G.spin+=430*dt;
+    if(K.roll) G.roll+=400*dt;
+    /* grab choisi par combinaison (grab + direction), et ENCHAÎNABLE : changer de
+       direction en vol banque la prise précédente et en démarre une nouvelle. */
+    if(K.grab){
+      const want = (K.kdown&&K.right)?'Seatbelt'
+                 : K.pass?'Tail Grab'
+                 : K.kdown?'Melon' : K.kup?'Stalefish' : K.left?'Nuclear'
+                 : K.right?'Slob' : 'Indy';
+      if(want!==G.grabName){
+        if(G.grabName&&G.grabT>0.12) G.grabsDone.push({name:G.grabName,t:G.grabT});
+        G.grabName=want; G.grabT=0;
+      }
+      G.grabHeld=true; G.grabT+=dt;
+    } else {
+      if(G.grabName&&G.grabT>0.12) G.grabsDone.push({name:G.grabName,t:G.grabT});
+      G.grabHeld=false; G.grabName=''; G.grabT=0;
+    }
+    G.passCD-=dt;
+    if(PRESS.pass&&G.passCD<=0&&G.airT>0.28&&G.passes<3){G.passes++;G.passCD=0.26;}
+    if(G.y<=ground&&G.vy<0) land(G,ground);
+  } else {
+    G.y=ground;
+    /* l'eau blanche et la terre ne se labourent pas : brisants ou plage = chute.
+       Seul le ponton se traverse (c'est le rail). */
+    const stH=staticH(G.x,G.z);
+    if(G.crashT<=0&&stH>2.6&&!onPier(G.x,G.z)){
+      G.bailT=2.0; G.crashT=2.0;   // wipeout appuyé : on reste, on se fait mal, on perd du temps
+      say(G,'CHUTE — '+(stH>4.6?'ENSABLÉ':'BANC DE SABLE'));
+      G.pot=0; G.mult=0; G.comboT=0; G.speed*=0.2; G.load=0;
+      G.splash={x:G.x,y:ground+0.2,z:G.z};
+      washOut(G);
+    }
+    /* face au vent / plus de vitesse : le rider s'assoit dans l'eau (pas de gros wipeout) */
+    if(G.crashT<=0&&G.sat<=0&&G.satCD<=0&&!G.kiteWet&&!onPier(G.x,G.z)
+       &&staticH(G.x,G.z)<2.6&&G.eff<0.12&&G.speed<3){
+      G.sat=1; say(G,'FACE AU VENT');
+      G.pot=0; G.mult=0; G.comboT=0; G.load=0;
+      G.satSplash={x:G.x,y:ground+0.1,z:G.z};
+    }
+    /* ponton = rail : le combo reste ouvert et les points montent */
+    if(onPier(G.x,G.z)&&staticH(G.x,G.z)>1.8){
+      if(!G.grinding){G.grinding=true;G.grindT=0;say(G,'PIER SLIDE',true);}
+      G.grindT+=dt;
+      if(G.mult>0) G.comboT=Math.max(G.comboT,0.9);
+      if(G.grindT>1.2) G.goals.pier=1;
+    } else if(G.grinding){
+      G.pot+=Math.round(G.grindT*180); G.mult=Math.max(G.mult,1);
+      G.comboT=1.5; G.grinding=false;
+    }
+  }
+
+  /* --- combo --- */
+  if(G.mult>0){
+    if(G.air||G.edging||G.grinding) G.comboT=Math.max(G.comboT,0.9);
+    else G.comboT-=dt;
+    if(G.comboT<=0) bank(G);
+  }
+
+  /* --- bouées --- */
+  for(const L of G.letters){
+    if(L.got) continue;
+    const d=Math.hypot(L.x-G.x,L.z-G.z);
+    if(d<3.4&&G.y>heightAt(L.x,L.z)+1.2){
+      L.got=true; G.got[L.c]=1; say(G,'LETTRE '+L.c,true);
+      if(G.letters.every(l=>l.got)) G.goals.letters=1;
+    }
+  }
+  /* remonter au vent = revenir vers -X */
+  if(G.x<-230) G.goals.upwind=1;
+
+  G.trickT-=dt; G.bannerT-=dt; G.bailT-=dt; G.satCD-=dt;
+  if(G.crashT>0){
+    const was=G.crashT; G.crashT-=dt;
+    /* fin du wipeout : on réapparaît dans l'eau la plus proche sous le vent */
+    if(was>0&&G.crashT<=0&&G.washX!=null){
+      G.x=G.washX; G.z=G.washZ; G.washX=null; G.washZ=null;
+      G.speed=3; G.kite=58;   // on garde le cap : on repart dans la mer, après le banc
+      G.splash={x:G.x,y:heightAt(G.x,G.z)+0.1,z:G.z};
+      say(G,'REDÉMARRAGE');
+    }
+  }
+  /* l'assise ne se termine PAS toute seule : il faut piquer l'aile pour repartir */
+  for(const k in PRESS) delete PRESS[k];
+}
+
+function say(G,s,good){G.banner=s;G.bannerT=1.2;G.bannerGood=!!good;}
+
+function land(G,ground){
+  G.air=false; G.y=ground; G.vy=0;
+  const halfSpin=Math.round(G.spin/180), spinOff=Math.abs(G.spin-halfSpin*180);
+  const fullRoll=Math.round(G.roll/360), rollOff=Math.abs(G.roll-fullRoll*360);
+  let fail='';
+  const stH=staticH(G.x,G.z);
+  if(stH>2.6&&!onPier(G.x,G.z)) fail=stH>4.6?'ENSABLÉ':'BANC DE SABLE';
+  else if(spinOff>50) fail='ROTATION';
+  else if(rollOff>55) fail='BACKROLL';
+  else if(G.grabHeld) fail='GRAB TENU';
+  else if(G.kite<26||G.kite>110) fail='AILE HORS FENETRE';
+
+  /* poser au ralenti dans le lit du vent : on s'assoit, pas de wipeout */
+  if(!fail&&G.airT>0.5&&G.eff<0.12){
+    G.trick=''; G.sat=1; G.spin=0; G.roll=0; say(G,'FACE AU VENT');
+    G.pot=0; G.mult=0; G.comboT=0; G.load=0; G.speed*=0.4;
+    G.satSplash={x:G.x,y:ground+0.1,z:G.z};
+    return;
+  }
+
+  if(fail){
+    const onSand=(fail==='ENSABLÉ'||fail==='BANC DE SABLE');
+    G.trick=''; G.bailT=onSand?2.0:1.3; G.crashT=onSand?2.0:1.35; say(G,'CHUTE — '+fail);
+    G.pot=0; G.mult=0; G.comboT=0; G.speed*=0.3; G.load=0;
+    G.spin=0; G.roll=0;
+    G.splash={x:G.x,y:ground+0.2,z:G.z};
+    if(onSand) washOut(G);
+    /* l'aile plantée basse tombe avec toi */
+    if(fail==='AILE HORS FENETRE'&&G.kite<26) kiteFall(G);
+    return;
+  }
+  const parts=[]; let pts=Math.round(G.airT*70);
+  /* gros saut : plus de 5 m de haut ou plus de 2 s en l'air */
+  const big=G.maxH>=5||G.airT>=2.0;
+  if(fullRoll>=1){parts.push(ROLLS[Math.min(3,fullRoll)]);pts+=Math.round(Math.pow(fullRoll,1.4)*230);}
+  if(halfSpin>=1){parts.push(SPINS[Math.min(6,halfSpin)]);pts+=Math.round(Math.pow(halfSpin,1.42)*135);}
+  /* enchaînement de grabs : on banque la prise encore tenue, puis on score toute
+     la série (bonus qui grimpe avec le nombre de prises différentes). */
+  if(G.grabHeld&&G.grabName&&G.grabT>0.12) G.grabsDone.push({name:G.grabName,t:G.grabT});
+  if(G.grabsDone.length){
+    parts.push(G.grabsDone.map(g=>g.name).join(' > '));
+    for(const g of G.grabsDone) pts+=Math.round(45+g.t*95);
+    if(G.grabsDone.length>1) pts+=G.grabsDone.length*90;   // bonus enchaînement
+  }
+  if(G.passes>0){parts.push(G.passes>1?G.passes+'x Handle Pass':'Handle Pass');pts+=G.passes*265;}
+  if(G.loopBoost){parts.push('Looped');pts*=2;G.loopBoost=0;}
+  if(big) pts+=Math.round(180+G.maxH*45);
+  if(!parts.length) parts.push(big?'BIG AIR':'Air');
+  else if(big) parts.unshift('Big Air');
+
+  /* un nombre impair de 180 → on repart en switch, le cap est inversé */
+  if(halfSpin%2===1){ G.heading=(G.heading+Math.PI)%TAU; G.switchy=!G.switchy; parts.push('to Switch'); }
+  /* réception plaquée : le rider claque la rotation et reprend l'axe */
+  G.spin=0; G.roll=0;
+
+  G.trick=parts.join(' + '); G.trickT=2.6;
+  say(G,G.trick,true); G.bannerT=2;   // la figure s'affiche en grand, comme les chutes
+  G.pot+=pts; G.mult++; G.comboT=1.5;
+  G.special=Math.min(100,G.special+pts/26);
+  if(G.airT>2.2) G.goals.air=1;
+}
+function bank(G){
+  if(G.mult>0){
+    const tot=G.pot*G.mult; G.score+=tot; G.best=Math.max(G.best,tot);
+    if(G.score>=40000) G.goals.score=1;
+  }
+  G.pot=0;G.mult=0;G.comboT=0;
+}
+
+
+let PROBE = newState();
+
+/* ================= RENDU ================= */
+const AR=16/9;   // ratio d'affichage
+const stage=document.getElementById('stage');
+/* rendu net pleine résolution : antialiasing + tone mapping ACES + sRGB pour un
+   look moderne (fini le pixelisé PS1). DPR plafonné pour tenir 60 fps sur le web. */
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance',preserveDrawingBuffer:true});
+renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,1.75));
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.NoToneMapping;   // pas d'ACES : évite le voile blanc délavé
+stage.insertBefore(renderer.domElement, stage.firstChild);
+
+const scene=new THREE.Scene();
+const FOGC=0x9fc9dd;                        // brume bleutée, moins blanche, plus loin
+scene.fog=new THREE.Fog(FOGC,140,520);
+
+const cam=new THREE.PerspectiveCamera(58,AR,0.5,900);
+scene.add(new THREE.HemisphereLight(0xcfe8f5,0x2E6B85,0.62));
+const sun=new THREE.DirectionalLight(0xffe9c0,0.55);
+sun.position.set(-80,120,60); scene.add(sun);
+/* --- rendu "dessiné" : cel-shading à 4 paliers --- */
+const gradTex=(()=>{
+  const d=new Uint8Array([90,90,90,255, 150,150,150,255, 210,210,210,255, 255,255,255,255]);
+  const t=new THREE.DataTexture(d,4,1,THREE.RGBAFormat);
+  t.minFilter=THREE.NearestFilter; t.magFilter=THREE.NearestFilter; t.needsUpdate=true;
+  return t;
+})();
+const toon=color=>new THREE.MeshToonMaterial({color,gradientMap:gradTex});
+/* les éléments héros gardent leurs couleurs pures quel que soit l'éclairage */
+const hero=(color,glow)=>new THREE.MeshToonMaterial({color,gradientMap:gradTex,emissive:color,emissiveIntensity:glow||0.42});
+/* contour encré : coque inversée légèrement plus grande */
+const OUTM=new THREE.MeshBasicMaterial({color:0x14202b,side:THREE.BackSide});
+const inked=(m,s)=>{const o=new THREE.Mesh(m.geometry,OUTM);o.scale.setScalar(s||1.07);m.add(o);return m;};
+
+/* --- ciel : dôme en dégradé + soleil + nuages --- */
+const skyDome=(()=>{
+  const g=new THREE.SphereGeometry(430,24,14);
+  const p=g.attributes.position, col=[];
+  const cH=new THREE.Color(0xeaf8fb), cM=new THREE.Color(0x9fd9ec), cZ=new THREE.Color(0x4fa8d8);
+  for(let i=0;i<p.count;i++){
+    const y=p.getY(i)/430;
+    let c;
+    if(y<=0.04) c=cH.clone();
+    else if(y<0.38) c=cH.clone().lerp(cM,(y-0.04)/0.34);
+    else c=cM.clone().lerp(cZ,Math.min(1,(y-0.38)/0.42));
+    col.push(c.r,c.g,c.b);
+  }
+  g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  const m=new THREE.Mesh(g,new THREE.MeshBasicMaterial({vertexColors:true,side:THREE.BackSide,fog:false}));
+  scene.add(m); return m;
+})();
+const sunDisc=(()=>{
+  const m=new THREE.Mesh(new THREE.CircleGeometry(17,20),
+    new THREE.MeshBasicMaterial({color:0xfff3cf,fog:false}));
+  scene.add(m); return m;
+})();
+const SUNDIR=new THREE.Vector3(-0.5,0.62,0.37).normalize();
+const clouds=[];
+{
+  const m=new THREE.MeshToonMaterial({color:0xffffff,gradientMap:gradTex,
+    emissive:0xffffff,emissiveIntensity:0.32,transparent:true,opacity:0.95});
+  for(let i=0;i<8;i++){
+    const g=new THREE.Group();
+    const n=3+(i%3);
+    for(let j=0;j<n;j++){
+      const r=3.2+((i*5+j*3)%5);
+      const b=new THREE.Mesh(new THREE.SphereGeometry(r,9,7),m);
+      b.scale.set(1.25,0.55,0.9);
+      b.position.set((j-(n-1)/2)*r*1.25,(j%2)*0.9-0.4,((j*3+i)%5)-2);
+      g.add(b);
+    }
+    g.position.set(((i*83)%560)-280, 58+((i*13)%34), ((i*151)%560)-280);
+    scene.add(g); clouds.push(g);
+  }
+}
+
+/* --- eau : vertex colors + reflets spéculaires du soleil sur les facettes --- */
+const SEG=180, SPAN=600;
+const wgeo=new THREE.PlaneGeometry(SPAN,SPAN,SEG,SEG);
+wgeo.rotateX(-Math.PI/2);
+/* maillage PLAT : le fond marin, la houle, la couleur et l'écume sont tous
+   calculés dans le shader en coordonnées MONDE, et le maillage suit le rider
+   (recentré chaque frame) → océan continu, sans aucune limite de carte. */
+wgeo.computeVertexNormals();
+/* ============ EAU — rendu réécrit de zéro ============
+   Surface lisse qui roule, sillon de soleil, Fresnel, translucidité des crêtes.
+   Écume 100% procédurale à partir d'un bruit organique DOMAIN-WARPÉ : plus de
+   produit sin(x)*sin(z) (qui créait le damier de tirets), donc des déferlantes
+   qui ressemblent à de vrais rouleaux d'eau blanche remontant le haut-fond. */
+const waterMat=new THREE.MeshPhongMaterial({color:0x1173a8,flatShading:false,shininess:150,specular:0x9db8c8});
+waterMat.onBeforeCompile=s=>{
+  s.uniforms.uT={value:0};
+  s.uniforms.uOff={value:new THREE.Vector2(0,0)};
+
+  /* fond marin porté en GLSL (sans le ponton) : le maillage suit le rider, donc
+     ridges/kicks/île apparaissent à leur vraie position monde et l'eau reste
+     profonde partout ailleurs — océan infini. */
+  const SEABED=
+    'float ridge(vec2 w,float z,float h,float wd,float x0,float x1){'+
+    'if(w.x<x0-4.0||w.x>x1+4.0)return 0.0;float d=(w.y-z)/wd;if(d<=-3.0||d>=3.0)return 0.0;'+
+    'float e=exp(-d*d);float ed=clamp(min((w.x-x0)/10.0,(x1-w.x)/10.0),0.0,1.0);return h*e*ed;}\n'+
+    'float kick(vec2 w,float x,float z,float h,float r){vec2 d=(w-vec2(x,z))/r;float q=dot(d,d);return q<9.0?h*exp(-q):0.0;}\n'+
+    'float seabed(vec2 w){float y=0.0;'+
+    'y+=ridge(w,-160.0,4.2,6.0,-270.0,270.0);'+
+    'y+=ridge(w,-60.0,2.8,4.5,-240.0,120.0);'+
+    'y+=ridge(w,70.0,2.2,4.0,-140.0,250.0);'+
+    'y+=kick(w,-120.0,-20.0,3.4,8.0);y+=kick(w,-40.0,-100.0,3.0,7.0);'+
+    'y+=kick(w,30.0,-30.0,2.8,6.0);y+=kick(w,90.0,120.0,4.6,9.0);'+
+    'y+=kick(w,-190.0,90.0,3.8,8.0);y+=kick(w,170.0,150.0,7.0,30.0);'+
+    'y+=kick(w,170.0,150.0,3.4,52.0);return y;}\n'+
+    'float swellW(vec2 p){return 0.6*sin(p.x*0.05-0.85*uT)+0.35*sin(p.y*0.075+0.65*uT)+0.22*sin((p.x+p.y)*0.13-1.3*uT);}\n';
+
+  s.vertexShader='uniform float uT;\nuniform vec2 uOff;\nvarying vec3 vWPos;\nvarying float vSb;\n'+SEABED
+   +s.vertexShader.replace('#include <begin_vertex>',
+    '#include <begin_vertex>\n'+
+    'vec2 w_=position.xz+uOff;\n'+
+    'float sb_=seabed(w_);\n'+
+    'float H_=swellW(w_)+0.09*sin(w_.x*0.6+2.2*uT)+0.07*sin(w_.y*0.8-1.8*uT)'+
+    '+sb_*0.17*(0.5+0.5*sin(uT*1.5-w_.x*0.07));\n'+
+    'transformed.y=sb_+H_;\n'+
+    'transformed.x-=0.5*cos(w_.x*0.05-0.85*uT);\n'+
+    'transformed.z-=0.3*cos(w_.y*0.075+0.65*uT);\n'+
+    'vWPos=vec3(w_.x,transformed.y,w_.y);\nvSb=sb_;\n');
+
+  s.fragmentShader='uniform float uT;\nvarying vec3 vWPos;\nvarying float vSb;\n'+
+    'float swAt(vec2 p){return 0.6*sin(p.x*0.05-0.85*uT)+0.35*sin(p.y*0.075+0.65*uT)+0.22*sin((p.x+p.y)*0.13-1.3*uT);}\n'+
+    'float flow(vec2 p,float t){p+=0.6*vec2(sin(p.y*0.8+t*0.7),cos(p.x*0.7-t*0.6));'+
+    'p+=0.35*vec2(sin(p.y*1.7-t),cos(p.x*1.5+t*0.9));'+
+    'float n=sin(p.x*0.7+t)+0.55*sin(p.y*1.1-t*0.8)+0.35*sin((p.x+p.y)*1.6+t*1.1);return n/1.9;}\n'+
+    'vec3 seaCol(float sb,float h){vec3 de=vec3(0.031,0.200,0.345),mi=vec3(0.067,0.451,0.659),'+
+    'sh=vec3(0.180,0.827,0.902),fo=vec3(0.969,0.984,1.0),sa=vec3(0.914,0.847,0.706),gr=vec3(0.435,0.682,0.416);'+
+    'if(sb>6.2)return gr;else if(sb>4.8)return mix(sa,gr,(sb-4.8)/2.2);'+
+    'else if(sb>3.1)return mix(fo,sa,clamp((sb-3.6)/1.4,0.0,1.0));'+
+    'else if(sb>1.0)return mix(sh,fo,(sb-1.0)/2.1);'+
+    'else if(sb>0.15)return mix(mi,sh,(sb-0.15)/0.85);'+
+    'return mix(de,mi,clamp((h+0.9)/1.8,0.0,1.0)*0.65);}\n'
+   +s.fragmentShader
+    .replace('#include <color_fragment>',
+     '#include <color_fragment>\n'+
+     'float sw_=swAt(vWPos.xz);\n'+
+     'float vSt=clamp(vSb,0.0,2.5);\n'+
+     'diffuseColor.rgb=seaCol(vSb,vSb+sw_);\n'+
+     'vec2 fp_=vWPos.xz+vec2(-uT*2.4,0.0);\n'+
+     'float tx_=flow(fp_*0.32,uT*0.85);\n'+
+     'float td_=flow(fp_*1.1+31.0,uT*1.4);\n'+
+     'float crest_=smoothstep(0.92,1.25,sw_)*smoothstep(0.15,0.75,tx_*0.6+td_*0.4+0.4)*0.7;\n'+
+     'float shoal_=smoothstep(0.65,1.3,vSt);\n'+
+     'float roll_=0.5+0.5*sin(vSt*3.0-uT*2.4+tx_*1.6);\n'+
+     'float brk_=shoal_*roll_*roll_*smoothstep(-0.15,0.55,tx_*0.7+td_*0.5+0.35);\n'+
+     'float wet_=smoothstep(2.1,2.5,vSt)*0.9;\n'+
+     'float foam_=clamp(max(crest_,max(brk_,wet_)),0.0,1.0);\n'+
+     'vec3 foamC_=mix(vec3(0.74,0.86,0.92),vec3(1.0),0.5+0.5*td_);\n'+
+     'diffuseColor.rgb=mix(diffuseColor.rgb,foamC_,foam_);\n')
+    .replace('#include <normal_fragment_begin>',
+     '#include <normal_fragment_begin>\n'+
+     'float att_=1.0/(1.0+0.025*length(vViewPosition));\n'+
+     'float gx_=0.09*cos(vWPos.x*0.05-0.85*uT)+0.086*cos((vWPos.x+vWPos.z)*0.13-1.3*uT);\n'+
+     'float gz_=0.079*cos(vWPos.z*0.075+0.65*uT)+0.086*cos((vWPos.x+vWPos.z)*0.13-1.3*uT);\n'+
+     'float dnx_=0.15*cos(vWPos.x*1.7+uT*2.6)+0.10*cos((vWPos.x+vWPos.z)*2.3-uT*3.1);\n'+
+     'float dnz_=0.15*cos(vWPos.z*1.9-uT*2.2)+0.10*cos((vWPos.x-vWPos.z)*2.1+uT*2.7);\n'+
+     'normal=normalize(normal+vec3(-(gx_+dnx_*att_),0.0,-(gz_+dnz_*att_)));\n')
+    .replace('#include <output_fragment>',
+     'float fres_=pow(1.0-max(dot(normalize(vViewPosition),normal),0.0),3.0);\n'+
+     'outgoingLight+=fres_*vec3(0.55,0.75,0.88)*0.28;\n'+
+     'outgoingLight+=vec3(0.10,0.42,0.46)*smoothstep(0.35,1.15,sw_)*(0.3+0.7*fres_)*0.28;\n'+
+     '#include <output_fragment>');
+  waterMat.userData.shader=s;
+};
+const waterMesh=new THREE.Mesh(wgeo,waterMat);
+waterMesh.frustumCulled=false;
+scene.add(waterMesh);
+const WCELL=SPAN/SEG;   // pas de recentrage = 1 maille, pour que la houle ne rampe pas
+/* open water : océan de fond qui file jusqu'à l'horizon dans toutes les directions,
+   pour qu'on se sente en pleine mer et non dans un bassin borné. Le brouillard le
+   fond dans le ciel au loin. */
+const farSea=new THREE.Mesh(new THREE.PlaneGeometry(9000,9000),
+  new THREE.MeshBasicMaterial({color:0x0c4368}));
+farSea.rotateX(-Math.PI/2); farSea.position.y=-0.18; farSea.frustumCulled=false;
+scene.add(farSea);
+
+/* --- ponton : pilotis visuels sur l'emprise analytique --- */
+{
+  const f=PIER;
+  const wood=toon(0x8a6a45);
+  const dark=toon(0x5c4630);
+  const deck=new THREE.Mesh(new THREE.BoxGeometry(f.x1-f.x0+3,0.4,f.z1-f.z0),wood);
+  deck.position.set((f.x0+f.x1)/2,f.h,(f.z0+f.z1)/2); scene.add(deck);
+  for(let z=f.z0+4;z<f.z1;z+=12){
+    for(const x of [f.x0,f.x1]){
+      const pl=new THREE.Mesh(new THREE.CylinderGeometry(0.26,0.3,f.h+2,8),dark);   // pilotis rond
+      pl.position.set(x,f.h/2-1,z); scene.add(pl);
+    }
+  }
+}
+/* --- l'île : vrais palmiers — tronc courbé, palmes retombantes, cocos --- */
+{
+  const trunkM=toon(0x9a7550), leafM=toon(0x3f9f55), cocoM=toon(0x5c4630);
+  const mkPalm=(px,pz,lean)=>{
+    const g=new THREE.Group(), base=staticH(px,pz);
+    let x=0,y=0;
+    for(let s=0;s<3;s++){
+      const ang=lean*(s+1)*0.16;
+      const seg=new THREE.Mesh(new THREE.CylinderGeometry(0.13-s*0.02,0.18-s*0.02,1.3,6),trunkM);
+      seg.rotation.z=ang;
+      seg.position.set(x+Math.sin(ang)*0.65,y+Math.cos(ang)*0.65,0);
+      x+=Math.sin(ang)*1.3; y+=Math.cos(ang)*1.3;
+      g.add(seg);
+    }
+    const top=new THREE.Group(); top.position.set(x,y+0.05,0);
+    for(let k=0;k<7;k++){
+      const fg=new THREE.Group();
+      fg.rotation.order='YZX';
+      const f=new THREE.Mesh(new THREE.BoxGeometry(2.0,0.06,0.4),leafM);
+      f.position.x=1.0;
+      fg.add(f);
+      fg.rotation.y=k/7*Math.PI*2;
+      fg.rotation.z=-0.55-(k%2)*0.18;
+      top.add(fg);
+    }
+    for(const dx of [-0.15,0.15]){
+      const c=new THREE.Mesh(new THREE.SphereGeometry(0.14,6,5),cocoM);
+      c.position.set(x+dx,y-0.15,0.12); g.add(c);
+    }
+    g.add(top);
+    g.position.set(px,base,pz); scene.add(g);
+  };
+  mkPalm(162,144,0.5); mkPalm(176,158,-0.4); mkPalm(167,161,0.3); mkPalm(173,140,-0.6);
+}
+/* --- l'épave : vieux chalutier rouillé, gîté et à moitié coulé (formes de coque,
+   plus une boîte). Coque = ellipsoïde allongé effilé aux bouts, proue conique. --- */
+{
+  const rust=toon(0x8a4a38), rustD=toon(0x6a3628), dark=toon(0x3a2a20), cabM=toon(0x9a6a4a);
+  const g=new THREE.Group();
+  const hull=new THREE.Mesh(new THREE.SphereGeometry(1.0,14,10),rust);
+  hull.scale.set(4.6,1.15,1.5); hull.position.y=0.4;                 // coque arrondie allongée
+  const belly=new THREE.Mesh(new THREE.SphereGeometry(1.0,12,8),rustD);
+  belly.scale.set(3.4,1.0,1.2); belly.position.set(0.2,-0.35,0);     // ventre sous la ligne de flottaison
+  const bow=new THREE.Mesh(new THREE.ConeGeometry(1.35,3.0,12),rust);
+  bow.rotation.z=-Math.PI/2; bow.position.set(4.4,0.45,0);           // proue effilée
+  const deck=new THREE.Mesh(new THREE.CylinderGeometry(1.3,1.5,0.4,12,1,false,0,Math.PI),rustD);
+  deck.rotation.set(Math.PI,0,Math.PI/2); deck.scale.set(1,4.4,1); deck.position.y=0.95;
+  const cab=new THREE.Mesh(new THREE.SphereGeometry(1.0,10,8),cabM);
+  cab.scale.set(1.3,0.9,1.1); cab.position.set(-1.4,1.5,0);          // cabine arrondie
+  const funnel=new THREE.Mesh(new THREE.CylinderGeometry(0.35,0.4,1.3,10),dark);
+  funnel.position.set(-2.2,1.9,0);
+  const mast=new THREE.Mesh(new THREE.CylinderGeometry(0.08,0.13,6,6),dark);
+  mast.rotation.z=0.6; mast.position.set(0.6,2.6,0.2);               // mât cassé penché
+  g.add(belly,hull,bow,deck,cab,funnel,mast);
+  g.position.set(90,staticH(90,120)-0.3,120); g.rotation.set(0.12,0.5,0.32);  // gîte + à moitié coulé
+  scene.add(g);
+}
+/* --- les lettres K·I·T·E : vraies lettres 3D dorées qui tournoient --- */
+const buoyM=[];
+{
+  const mY=hero(0xFFD400,0.45);
+  /* fûts encrés, proportions typographiques : hampe fine, traverses équilibrées */
+  const bar_=(g,w,h,x,y,rz)=>{
+    const m=inked(new THREE.Mesh(new THREE.BoxGeometry(w,h,0.3),mY),1.1);
+    m.position.set(x,y,0); if(rz) m.rotation.z=rz;
+    g.add(m); return m;
+  };
+  const GLYPH={
+    K:g=>{bar_(g,0.26,2,-0.42,0);bar_(g,0.26,1.3,0.2,0.52,-0.68);bar_(g,0.26,1.3,0.2,-0.52,0.68);},
+    I:g=>{bar_(g,0.26,2,0,0);bar_(g,0.8,0.26,0,0.87);bar_(g,0.8,0.26,0,-0.87);},
+    T:g=>{bar_(g,1.2,0.26,0,0.87);bar_(g,0.26,1.74,0,-0.13);},
+    E:g=>{bar_(g,0.26,2,-0.42,0);bar_(g,0.95,0.26,0.02,0.87);bar_(g,0.75,0.24,-0.08,0);bar_(g,0.95,0.26,0.02,-0.87);}
+  };
+  for(const L of PROBE.letters){
+    const g=new THREE.Group();
+    GLYPH[L.c](g);
+    g.scale.setScalar(1.15);
+    g.position.set(L.x,heightAt(L.x,L.z)+3.2,L.z);
+    scene.add(g); buoyM.push(g);
+  }
+}
+
+/* --- squelette anatomique du rider (constantes vérifiées par les tests Cypress) :
+   points partagés entre segments = membres continus ; pieds dans la planche. --- */
+const RIG={
+  boardHalfW:0.22, boardTop:0.075,
+  footHalfW:0.13,   // demi-longueur du pied (en travers de la planche)
+  footOffX:0.07,    // le pied est DÉCALÉ vers les orteils : la cheville est au talon → forme en L
+  pelvis:[0,1.05,0.02],
+  hipF:[0.09,1.0,0.06],  kneeF:[0.15,0.55,0.28],  footF:[0,0.15,0.40],   // footF = la CHEVILLE
+  hipB:[-0.09,1.0,-0.02], kneeB:[-0.05,0.55,-0.28], footB:[0,0.15,-0.40]
+};
+
+/* --- rider : silhouette athlétique dessinée, stance surf, cheveux au vent.
+   Trois ensembles articulés : train inférieur (hanches), bras G, bras D. --- */
+const rider=new THREE.Group();
+let hairGrp, lowerGrp, upperGrp, armLGrp, armRGrp, barMesh, hairLocks=[], grabArm, grabHand;
+{
+  const suit=toon(0x2B2F36), suitD=toon(0x1e2228);
+  const sk=toon(0xd99c6b);
+  const hairM=new THREE.MeshToonMaterial({color:0xf2d789,gradientMap:gradTex,emissive:0xb89042,emissiveIntensity:0.8}); // blond décoloré franc, lumineux même à l'ombre
+  const bd=hero(0xFFD400,0.3), bdT=hero(0xFF4FA3,0.3);
+  /* deck de twin-tip façon 2018 : carbone sombre, bande centrale rose, liserés jaunes */
+  const boardTex=(()=>{
+    const c=document.createElement('canvas'); c.width=64; c.height=256;
+    const gx=c.getContext('2d');
+    gx.fillStyle='#24272c'; gx.fillRect(0,0,64,256);
+    gx.fillStyle='#FF4FA3'; gx.fillRect(23,0,18,256);
+    gx.fillStyle='#FFD400'; gx.fillRect(7,0,5,256); gx.fillRect(52,0,5,256);
+    const t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; t.anisotropy=4; return t;
+  })();
+  const boardMat=new THREE.MeshToonMaterial({map:boardTex,gradientMap:gradTex,emissive:0x1a1c20,emissiveIntensity:0.25});
+  const hn=hero(0xFFD400,0.2), cy=hero(0x2ED3E6,0.18);
+  const dark=toon(0x1a1d23);
+  const V=THREE.Vector3;
+
+  /* membre : cylindre orienté entre deux points */
+  const seg=(a,b,r1,r2,mat)=>{
+    const d=new V(b[0]-a[0],b[1]-a[1],b[2]-a[2]);
+    const L=d.length();
+    const m=new THREE.Mesh(new THREE.CylinderGeometry(r2,r1,L,8),mat);
+    m.position.set((a[0]+b[0])/2,(a[1]+b[1])/2,(a[2]+b[2])/2);
+    m.quaternion.setFromUnitVectors(new V(0,1,0),d.normalize());
+    return m;
+  };
+  const ball=(x,y,z,r,mat)=>{
+    const m=new THREE.Mesh(new THREE.SphereGeometry(r,10,8),mat);
+    m.position.set(x,y,z); return m;
+  };
+
+  /* twin-tip : planche PLATE, courte (~0,75× la taille du rider), spatules à peine relevées */
+  const board=inked(new THREE.Mesh(new THREE.BoxGeometry(0.44,0.07,1.55),boardMat),1.04);
+  board.position.y=0.04;
+  const tip=new THREE.Mesh(new THREE.BoxGeometry(0.42,0.06,0.26),bdT);
+  tip.position.set(0,0.06,0.86); tip.rotation.x=-0.13;         // léger rocker seulement
+  const tail=new THREE.Mesh(new THREE.BoxGeometry(0.42,0.06,0.26),bdT);
+  tail.position.set(0,0.06,-0.86); tail.rotation.x=0.13;
+  const finA=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.11,0.2),dark); finA.position.set(0,-0.06,0.66);
+  const finB=new THREE.Mesh(new THREE.BoxGeometry(0.06,0.11,0.2),dark); finB.position.set(0,-0.06,-0.66);
+
+  /* stance de kite construite depuis RIG (constantes anatomiques testées) :
+     hanches → genoux → pieds partagent leurs points (jambes CONTINUES), pieds
+     PARALLÈLES, centrés et DANS la largeur de planche, chaussons ARRONDIS. */
+  const thighF=inked(seg(RIG.hipF,RIG.kneeF,0.095,0.08,suitD));
+  const shinF =inked(seg(RIG.kneeF,RIG.footF,0.075,0.055,suitD));
+  const thighB=inked(seg(RIG.hipB,RIG.kneeB,0.095,0.08,suitD));
+  const shinB =inked(seg(RIG.kneeB,RIG.footB,0.075,0.055,suitD));
+  /* chausson en L : la cheville (footF/B) est au TALON, le pied s'allonge vers les
+     orteils (décalé de footOffX) — plus de forme en T symétrique. */
+  const footF=new THREE.Mesh(new THREE.SphereGeometry(0.12,10,8),dark);
+  footF.scale.set(RIG.footHalfW/0.12,0.5,0.85); footF.position.set(RIG.footF[0]+RIG.footOffX,RIG.footF[1]-0.02,RIG.footF[2]);
+  const footB=new THREE.Mesh(new THREE.SphereGeometry(0.12,10,8),dark);
+  footB.scale.set(RIG.footHalfW/0.12,0.5,0.85); footB.position.set(RIG.footB[0]+RIG.footOffX,RIG.footB[1]-0.02,RIG.footB[2]);
+
+  /* train inférieur : pivot aux hanches (tuck des grabs) */
+  lowerGrp=new THREE.Group(); lowerGrp.position.set(0,1.02,0.02);
+  for(const m of [board,tip,tail,finA,finB,thighF,shinF,thighB,shinB,footF,footB]){
+    m.position.y-=1.02; m.position.z-=0.02; lowerGrp.add(m);
+  }
+
+  /* bassin (relié aux hanches), harnais = CEINTURE galbée (torus, pas un cube) + crochet */
+  const pelvis=inked(ball(RIG.pelvis[0],RIG.pelvis[1],RIG.pelvis[2],0.17,suit)); pelvis.scale.set(1.35,0.85,1.05);
+  const harness=new THREE.Mesh(new THREE.TorusGeometry(0.2,0.06,8,16),hn);
+  harness.rotation.x=Math.PI/2; harness.scale.set(1.0,0.72,1.0); harness.position.set(0,1.14,0.04);
+  const hook=new THREE.Mesh(new THREE.SphereGeometry(0.055,8,6),toon(0x9aa2ac)); hook.scale.set(1.3,1.0,0.7); hook.position.set(0,1.09,0.24);
+  const torso=inked(seg([0,1.12,0.02],[0,1.66,0.15],0.15,0.19,suit));
+  const chest=inked(ball(0,1.67,0.15,0.19,suit)); chest.scale.set(1.35,0.8,1.0);
+
+  /* bras vers la barre, pivotés à l'épaule */
+  const armLu=inked(seg([-0.27,1.72,0.16],[-0.31,1.6,0.34],0.06,0.055,suit));
+  const armLf=inked(seg([-0.31,1.6,0.34],[-0.24,1.5,0.48],0.05,0.045,suit));
+  const armRu=inked(seg([0.27,1.72,0.16],[0.31,1.6,0.34],0.06,0.055,suit));
+  const armRf=inked(seg([0.31,1.6,0.34],[0.24,1.5,0.48],0.05,0.045,suit));
+  const handL=ball(-0.24,1.5,0.49,0.06,sk);
+  const handR=ball(0.24,1.5,0.49,0.06,sk);
+  armLGrp=new THREE.Group(); armLGrp.position.set(-0.27,1.72,0.16);
+  for(const m of [armLu,armLf,handL]){ m.position.x+=0.27; m.position.y-=1.72; m.position.z-=0.16; armLGrp.add(m); }
+  armRGrp=new THREE.Group(); armRGrp.position.set(0.27,1.72,0.16);
+  for(const m of [armRu,armRf,handR]){ m.position.x-=0.27; m.position.y-=1.72; m.position.z-=0.16; armRGrp.add(m); }
+  barMesh=new THREE.Group(); barMesh.position.set(0,1.48,0.5);   // groupe animé (roulis)
+  const barTube=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,1.12,8),dark);
+  barTube.rotation.z=Math.PI/2; barMesh.add(barTube);            // tube rond horizontal
+  const bar=barMesh;
+  /* bras + main dédiés au GRAB : visés directement sur le rail de la planche (IK) */
+  grabArm=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.042,0.4,6),suit); grabArm.visible=false;
+  grabHand=ball(0,0,0,0.06,sk); grabHand.visible=false;
+
+  /* cou, tête, lunettes, chevelure fournie qui vole au vent */
+  const neck=seg([0,1.76,0.15],[0,1.86,0.16],0.06,0.06,sk);
+  const head=inked(ball(0,1.99,0.16,0.16,sk));
+  const shadeM=new THREE.MeshToonMaterial({color:0x14181f,gradientMap:gradTex,emissive:0x0a1420,emissiveIntensity:0.4});
+  const shades=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.08,0.05),shadeM); shades.position.set(0,2.02,0.30);
+  /* chevelure de surfer : calotte proche du crâne + longues MÈCHES qui streament
+     vers l'arrière et ondulent au vent (animées mèche par mèche dans frame). */
+  hairGrp=new THREE.Group();
+  const skull=ball(0,0.03,0.0,0.155,hairM); skull.scale.set(1.06,0.92,1.08);
+  const fringe=ball(0,0.09,0.12,0.1,hairM); fringe.scale.set(1.15,0.55,0.6);
+  hairGrp.add(skull,fringe);
+  hairLocks=[];
+  /* chevelure = quelques NAPPES plates et larges qui se chevauchent et ondulent
+     (pas des tubes → pas de dreadlocks) : ça balaie vers l'arrière au vent. */
+  const sheets=[
+    {w:0.34,len:0.62,y:0.07,rz:0,ph:0.0,side:0},
+    {w:0.30,len:0.74,y:0.02,rz:0,ph:1.3,side:0},
+    {w:0.24,len:0.6,y:0.0,rz:0.5,ph:2.4,side:0.4},
+    {w:0.24,len:0.6,y:0.0,rz:-0.5,ph:3.5,side:-0.4}
+  ];
+  for(const d of sheets){
+    const lock=new THREE.Group(); lock.position.set(0,d.y,-0.05); lock.rotation.z=d.rz;
+    const s1=new THREE.Mesh(new THREE.BoxGeometry(d.w,0.035,d.len*0.5),hairM); s1.position.z=-d.len*0.25;
+    const mid=new THREE.Group(); mid.position.z=-d.len*0.5;
+    const s2=new THREE.Mesh(new THREE.BoxGeometry(d.w*0.85,0.03,d.len*0.5),hairM); s2.position.z=-d.len*0.25; mid.add(s2);
+    const tip=new THREE.Group(); tip.position.z=-d.len*0.5; mid.add(tip);
+    const s3=new THREE.Mesh(new THREE.BoxGeometry(d.w*0.6,0.025,d.len*0.4),hairM); s3.position.z=-d.len*0.2; tip.add(s3);
+    lock.add(s1,mid);
+    hairGrp.add(lock);
+    hairLocks.push({lock,mid,tip,phase:d.ph,side:d.side});
+  }
+  hairGrp.position.set(0,2.0,0.05);
+
+  /* le HAUT du corps est regroupé pour l'orienter de profil vers l'aile
+     (stance de kite) sans toucher à la planche/aux jambes. */
+  upperGrp=new THREE.Group();
+  upperGrp.add(pelvis,harness,hook,torso,chest,armLGrp,armRGrp,bar,neck,head,shades,hairGrp);
+  rider.add(lowerGrp,upperGrp,grabArm,grabHand);
+}
+const riderPivot=new THREE.Group(); riderPivot.add(rider); scene.add(riderPivot);
+/* ombre portée : lisibilité de la hauteur */
+const shadow=new THREE.Mesh(new THREE.CircleGeometry(1.15,12),
+  new THREE.MeshBasicMaterial({color:0x06222f,transparent:true,opacity:0.28,depthWrite:false}));
+shadow.rotation.x=-Math.PI/2; scene.add(shadow);
+
+/* --- aile : bow kite épuré façon matériel 2018 — canopy uni dégradé, un seul
+   liseré, bords de fuite marqués, et wingtips en couleur contrastée. --- */
+const kiteTex=(()=>{
+  const c=document.createElement('canvas'); c.width=c.height=128;
+  const g=c.getContext('2d');
+  const grad=g.createLinearGradient(0,0,0,128);
+  grad.addColorStop(0,'#ff87c3'); grad.addColorStop(0.45,'#FF4FA3'); grad.addColorStop(1,'#dd3a8c');
+  g.fillStyle=grad; g.fillRect(0,0,128,128);
+  g.strokeStyle='#F7FBFF'; g.lineWidth=3;              // un seul liseré propre
+  g.beginPath(); g.moveTo(0,88); g.lineTo(128,76); g.stroke();
+  g.fillStyle='#2B2F36'; g.fillRect(0,124,128,4);      // bord de fuite
+  const t=new THREE.CanvasTexture(c); t.encoding=THREE.sRGBEncoding; t.anisotropy=4; return t;
+})();
+const kite=new THREE.Group();
+{
+  const panelMat=new THREE.MeshToonMaterial({map:kiteTex,emissiveMap:kiteTex,
+    emissive:0xffffff,emissiveIntensity:0.3,gradientMap:gradTex});
+  const tipMat=new THREE.MeshToonMaterial({color:0xFFD400,gradientMap:gradTex,
+    emissive:0xFFD400,emissiveIntensity:0.34});   // wingtips jaunes contrastés
+  const leM=hero(0xFF4FA3,0.35);   // boudin ton sur ton
+  const R=3.8, N=9;
+  for(let i=0;i<N;i++){
+    const ang=(i-(N-1)/2)/((N-1)/2)*1.1;   // -1.1..1.1 rad le long de l'arceau
+    const g=new THREE.Group();
+    const mat=(i<1||i>N-2)?tipMat:panelMat;   // 1er/dernier panneau = wingtip
+    const panel=new THREE.Mesh(new THREE.BoxGeometry(0.98,0.09,1.9),mat);
+    const le=new THREE.Mesh(new THREE.CylinderGeometry(0.13,0.13,1.0,7),leM);
+    le.rotation.z=Math.PI/2; le.position.set(0,0.05,0.9);  // BA côté +z local = face au vent
+    g.add(panel,le);
+    g.position.set(Math.sin(ang)*R,(Math.cos(ang)-1)*R*0.9,0);
+    g.rotation.z=-ang;
+    kite.add(g);
+  }
+}
+scene.add(kite);
+const lineMat=new THREE.LineBasicMaterial({color:0xeef8fc,transparent:true,opacity:0.55});
+const lineGeo=new THREE.BufferGeometry();
+/* 5 segments : tronc du chicken-loop, 2 avant en Y vers le bord d'attaque,
+   2 arrière de la barre aux oreilles */
+lineGeo.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(30),3));
+const lines=new THREE.LineSegments(lineGeo,lineMat);
+lines.frustumCulled=false;   // géométrie mise à jour chaque frame : jamais culler
+scene.add(lines);
+
+/* --- texture de goutte : disque doux, partagé par toutes les particules --- */
+const dropTex=(()=>{
+  const c=document.createElement('canvas'); c.width=c.height=32;
+  const g=c.getContext('2d');
+  const r=g.createRadialGradient(16,16,2,16,16,15);
+  r.addColorStop(0,'rgba(255,255,255,1)');
+  r.addColorStop(0.55,'rgba(255,255,255,.85)');
+  r.addColorStop(1,'rgba(255,255,255,0)');
+  g.fillStyle=r; g.fillRect(0,0,32,32);
+  return new THREE.CanvasTexture(c);
+})();
+const dropMat=(size,color)=>new THREE.PointsMaterial({color:color||0xF7FBFF,size,
+  map:dropTex,transparent:true,depthWrite:false,alphaTest:0.05});
+
+/* --- écume dérivante --- */
+const foam=(()=>{
+  const N=800, pos=new Float32Array(N*3);
+  for(let i=0;i<N;i++){
+    pos[i*3]=(Math.random()-0.5)*560; pos[i*3+2]=(Math.random()-0.5)*560;
+    pos[i*3+1]=heightAt(pos[i*3],pos[i*3+2])+0.12;
+  }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  const pts=new THREE.Points(g,dropMat(0.85));
+  pts.frustumCulled=false;
+  scene.add(pts); return pts;
+})();
+
+/* --- particules d'eau : ShaderMaterial → TAILLE par goutte (grosses gerbes près
+   du rail, fines gouttelettes au loin), atténuation perspective, blending additif.
+   C'est ce qui différencie une vraie projection d'eau d'un saupoudrage de neige. --- */
+const sprayMat=new THREE.ShaderMaterial({
+  uniforms:{uTex:{value:dropTex}},
+  vertexShader:'attribute float aSize;\nvarying vec3 vC;\nvarying float vA;\n'+
+    'void main(){ vC=color; vA=aSize; vec4 mv=modelViewMatrix*vec4(position,1.0);'+
+    'gl_PointSize=aSize*(360.0/max(1.0,-mv.z)); gl_Position=projectionMatrix*mv; }',
+  fragmentShader:'uniform sampler2D uTex;\nvarying vec3 vC;\nvarying float vA;\n'+
+    'void main(){ vec4 t=texture2D(uTex,gl_PointCoord); if(t.a<0.03||vA<=0.0)discard;'+
+    'gl_FragColor=vec4(vC*t.a,t.a); }',
+  transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,vertexColors:true
+});
+function makePool(n,size){
+  const pos=new Float32Array(n*3), col=new Float32Array(n*3), siz=new Float32Array(n);
+  for(let i=0;i<n;i++){ pos[i*3+1]=-999; siz[i]=0; }
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));
+  g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+  g.setAttribute('aSize',new THREE.Float32BufferAttribute(siz,1));
+  const pts=new THREE.Points(g,sprayMat);
+  pts.frustumCulled=false;
+  scene.add(pts);
+  return {pts,vel:new Float32Array(n*3),life:new Float32Array(n),
+          life0:new Float32Array(n),col0:new Float32Array(n*3),sz0:new Float32Array(n),base:size,i:0,n};
+}
+/* onde circulaire à l'impact */
+const ring=(()=>{
+  const m=new THREE.Mesh(new THREE.RingGeometry(0.72,1,24),
+    new THREE.MeshBasicMaterial({color:0xF7FBFF,transparent:true,opacity:0,side:THREE.DoubleSide,depthWrite:false}));
+  m.rotation.x=-Math.PI/2; m.visible=false; scene.add(m);
+  return {m,t:9,x:0,z:0};
+})();
+function ringAt(x,z){ ring.t=0; ring.x=x; ring.z=z; ring.m.visible=true; }
+function ringTick(dt){
+  if(!ring.m.visible) return;
+  ring.t+=dt;
+  if(ring.t>=0.8){ ring.m.visible=false; return; }
+  const s=0.8+ring.t*7;
+  ring.m.position.set(ring.x,heightAt(ring.x,ring.z)+0.1,ring.z);
+  ring.m.scale.set(s,s,s);
+  ring.m.material.opacity=0.6*(1-ring.t/0.8);
+}
+function poolTick(pool,dt){
+  const p=pool.pts.geometry.attributes.position, c=pool.pts.geometry.attributes.color,
+        sz=pool.pts.geometry.attributes.aSize;
+  let dirty=false;
+  for(let j=0;j<pool.n;j++){
+    if(pool.life[j]<=0) continue;
+    pool.life[j]-=dt;
+    pool.vel[j*3+1]-=20*dt;
+    /* traînée qui freine dans l'air (gouttes fines ralentissent plus) */
+    const drag=Math.pow(0.6,dt);
+    pool.vel[j*3]*=drag; pool.vel[j*3+2]*=drag;
+    const py=p.getY(j)+pool.vel[j*3+1]*dt;
+    p.setXYZ(j,p.getX(j)+pool.vel[j*3]*dt, py, p.getZ(j)+pool.vel[j*3+2]*dt);
+    const f=pool.life[j]>0?pool.life[j]/pool.life0[j]:0;
+    c.setXYZ(j,pool.col0[j*3]*f,pool.col0[j*3+1]*f,pool.col0[j*3+2]*f);
+    sz.setX(j,pool.sz0[j]*(0.35+0.65*f));
+    if(pool.life[j]<=0){ p.setY(j,-999); sz.setX(j,0); }
+    dirty=true;
+  }
+  if(dirty){ p.needsUpdate=true; c.needsUpdate=true; sz.needsUpdate=true; }
+}
+const splash=makePool(140,0.9), spray=makePool(520,0.5);
+function splashAt(x,y,z,n){
+  ringAt(x,z);
+  const p=splash.pts.geometry.attributes.position, c=splash.pts.geometry.attributes.color,
+        sz=splash.pts.geometry.attributes.aSize;
+  for(let k=0;k<(n||60);k++){
+    const j=splash.i++%splash.n;
+    p.setXYZ(j,x+(Math.random()-0.5)*1.6,y+Math.random()*0.4,z+(Math.random()-0.5)*1.6);
+    splash.vel[j*3]=(Math.random()-0.5)*8;
+    splash.vel[j*3+1]=3.5+Math.random()*8;
+    splash.vel[j*3+2]=(Math.random()-0.5)*8;
+    splash.life[j]=0.8+Math.random()*0.6; splash.life0[j]=splash.life[j];
+    const b=0.82+Math.random()*0.18;
+    splash.col0[j*3]=b; splash.col0[j*3+1]=b; splash.col0[j*3+2]=b;
+    c.setXYZ(j,b,b,b);
+    splash.sz0[j]=(0.7+Math.random()*1.9); sz.setX(j,splash.sz0[j]);   // grosses éclaboussures variées
+  }
+  p.needsUpdate=true; c.needsUpdate=true; sz.needsUpdate=true;
+}
+/* --- sillage : naît étroit à la planche, s'élargit en vieillissant (V de
+   Kelvin + diffusion), dérive avec le vent et s'estompe en ~2,5 s --- */
+const TRAILN=64, TRAIL_LIFE=2.5, TRAIL_STEP=0.7;
+const trail=(()=>{
+  const g=new THREE.BufferGeometry();
+  g.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(TRAILN*2*3),3));
+  g.setAttribute('color',new THREE.Float32BufferAttribute(new Float32Array(TRAILN*2*3),3));
+  const idx=[];
+  for(let i=0;i<TRAILN-1;i++){
+    const a=i*2,b=a+1,c=a+2,d=a+3;
+    idx.push(a,b,c, b,d,c);
+  }
+  g.setIndex(idx);
+  /* le ruban reçoit une texture d'écume procédurale (même esprit que la mer) :
+     un bruit organique qui défile creuse des trous d'aération et nuance la teinte,
+     au lieu d'une bande de couleur uniforme. */
+  const trailMat=new THREE.MeshBasicMaterial({vertexColors:true,
+    blending:THREE.AdditiveBlending,depthWrite:false,transparent:true});
+  trailMat.onBeforeCompile=sh=>{
+    sh.uniforms.uT={value:0};
+    sh.vertexShader='varying vec3 vWP;\n'+sh.vertexShader.replace('#include <begin_vertex>',
+      '#include <begin_vertex>\nvWP=transformed;');
+    sh.fragmentShader='uniform float uT;\nvarying vec3 vWP;\n'+
+      'float tflow(vec2 p,float t){p+=0.5*vec2(sin(p.y*0.9+t),cos(p.x*0.8-t));'+
+      'p+=0.3*vec2(sin(p.y*1.9-t*1.3),cos(p.x*1.7+t));'+
+      'return (sin(p.x*1.3+t)+0.6*sin(p.y*1.7-t*1.2)+0.4*sin((p.x+p.y)*2.1+t))/2.0;}\n'
+     +sh.fragmentShader.replace('#include <color_fragment>',
+      '#include <color_fragment>\n'+
+      'float f_=tflow(vWP.xz*1.5-vec2(uT*2.2,0.0),uT*1.1);\n'+
+      'float m_=smoothstep(-0.35,0.65,f_);\n'+              // trous d\'aération
+      'diffuseColor.rgb*=0.25+0.85*m_;\n'+                  // densité qui se déchire
+      'diffuseColor.rgb=mix(diffuseColor.rgb*vec3(0.68,0.94,1.06),diffuseColor.rgb,m_);\n'); // teinte turquoise dans les creux
+    trailMat.userData.shader=sh;
+  };
+  const m=new THREE.Mesh(g,trailMat);
+  m.frustumCulled=false; scene.add(m);
+  return {m,hist:[]};
+})();
+function trailTick(G){
+  const h=trail.hist;
+  const riding=G.phase==='run'&&!G.air&&!G.kiteWet&&G.crashT<=0&&G.speed>5;
+  const px=G.x-Math.sin(G.heading)*1.2, pz=G.z-Math.cos(G.heading)*1.2;
+  if(riding){
+    const last=h[0];
+    if(!last||Math.hypot(px-last.x,pz-last.z)>TRAIL_STEP){
+      h.unshift({x:px,z:pz,
+        sx:Math.cos(G.heading),sz:-Math.sin(G.heading),
+        w0:0.13+G.speed*0.007+(G.edging?0.22:0), t:G.t});
+    }
+  }
+  while(h.length&&(G.t-h[h.length-1].t)>TRAIL_LIFE) h.pop();
+  while(h.length>TRAILN-1) h.pop();
+  /* tête du ruban collée à la planche, puis l'historique vieillissant */
+  const pts=riding?[{x:px,z:pz,sx:Math.cos(G.heading),sz:-Math.sin(G.heading),w0:0.1,t:G.t},...h]:h;
+  const p=trail.m.geometry.attributes.position, c=trail.m.geometry.attributes.color;
+  for(let i=0;i<TRAILN;i++){
+    const s=pts[i];
+    if(!s){ p.setXYZ(i*2,0,-999,0); p.setXYZ(i*2+1,0,-999,0);
+            c.setXYZ(i*2,0,0,0); c.setXYZ(i*2+1,0,0,0); continue; }
+    const age=Math.min(1,(G.t-s.t)/TRAIL_LIFE);
+    const w=s.w0*(1+age*2.6);              // diffusion : le sillage s'ouvre en V
+    const drift=(G.t-s.t)*1.2;             // la vieille écume dérive au vent
+    const cx=s.x+drift, cz=s.z;
+    /* teinte : écume fraîche blanche → bleu-vert froid en se dissolvant */
+    const b=0.42*Math.pow(1-age,1.9);
+    const cr=b*(1.0-0.30*age), cg=b*(1.0-0.06*age), cb=b*(1.0+0.05*age);
+    const lx=cx-s.sx*w, lz=cz-s.sz*w, rx=cx+s.sx*w, rz=cz+s.sz*w;
+    p.setXYZ(i*2,  lx,heightAt(lx,lz)+0.05,lz);
+    p.setXYZ(i*2+1,rx,heightAt(rx,rz)+0.05,rz);
+    c.setXYZ(i*2,cr,cg,cb); c.setXYZ(i*2+1,cr,cg,cb);
+  }
+  p.needsUpdate=true; c.needsUpdate=true;
+}
+
+/* --- gerbe latérale : la carre projette l'eau sous le vent. Fort à contre /
+   au carving, faible en downwind. Couleur nuancée blanc→turquoise→bleu. --- */
+let sprayAcc=0;
+function sprayTick(G,dt){
+  if(G.phase==='run'&&!G.air&&!G.kiteWet&&G.crashT<=0&&G.sat<=0&&G.speed>6){
+    const pa=pointAngle(G.heading);
+    const up=Math.min(1,pa/90);                 // 0 plein vent arrière → 1 travers/près
+    const carve=G.edging?0.7+G.load:0.25;       // la carre charge la gerbe
+    const amt=carve*(0.3+0.7*up);               // nettement moins en downwind
+    sprayAcc+=G.speed*dt*amt*5.5;               // beaucoup plus de gouttes
+    const hx=Math.sin(G.heading), hz=Math.cos(G.heading);   // avant
+    const latx=Math.cos(G.heading), latz=-Math.sin(G.heading); // latéral
+    const ls=(latx*WIND.x>=0)?1:-1;             // côté sous le vent
+    const ox=latx*ls, oz=latz*ls;               // direction de la gerbe
+    const p=spray.pts.geometry.attributes.position, c=spray.pts.geometry.attributes.color,
+          sz=spray.pts.geometry.attributes.aSize;
+    let dirty=false;
+    while(sprayAcc>=1){
+      sprayAcc--;
+      const j=spray.i++%spray.n;
+      const bx=G.x-hx*1.0+ox*0.5, bz=G.z-hz*1.0+oz*0.5;   // naît au rail sous le vent
+      p.setXYZ(j,bx+(Math.random()-0.5)*0.5,G.y+0.1,bz+(Math.random()-0.5)*0.5);
+      const power=1.7+G.speed*0.13+carve*4.2;
+      const r1=0.5+1.0*Math.random();
+      spray.vel[j*3]  =ox*power*r1-hx*G.speed*0.14+(Math.random()-0.5)*1.6;
+      spray.vel[j*3+1]=2.4+Math.random()*4.4+carve*3.0;
+      spray.vel[j*3+2]=oz*power*r1-hz*G.speed*0.14+(Math.random()-0.5)*1.6;
+      /* nuance de couleur par goutte */
+      const t=Math.random(); let cr,cg,cb;
+      if(t<0.6){cr=1;cg=1;cb=1;}                  // blanc écume
+      else if(t<0.85){cr=0.72;cg=0.94;cb=1.0;}    // turquoise pâle
+      else{cr=0.55;cg=0.78;cb=0.96;}              // bleu clair
+      const br=0.78+Math.random()*0.22;
+      spray.col0[j*3]=cr*br; spray.col0[j*3+1]=cg*br; spray.col0[j*3+2]=cb*br;
+      c.setXYZ(j,cr*br,cg*br,cb*br);
+      /* grosses gouttes près du rail (r1 faible), fines qui volent loin (r1 fort) */
+      spray.sz0[j]=(2.4-1.3*r1)*(0.7+carve*0.5); sz.setX(j,spray.sz0[j]);
+      spray.life[j]=0.45+Math.random()*0.6; spray.life0[j]=spray.life[j];
+      dirty=true;
+    }
+    if(dirty){ p.needsUpdate=true; c.needsUpdate=true; sz.needsUpdate=true; }
+  }
+  poolTick(spray,dt);
+}
+
+/* ================= ENTRÉES ================= */
+const KEYS={left:0,right:0,kup:0,kdown:0,edge:0,spin:0,roll:0,grab:0,pass:0,loop:0};
+const PRESS={};
+function setK(k,v){
+  if(!(k in KEYS))return;
+  if(v&&!KEYS[k])PRESS[k]=1;
+  KEYS[k]=v?1:0;
+  const b=document.querySelector('[data-k="'+k+'"]'); if(b)b.classList.toggle('on',!!v);
+}
+/* main droite : flèches = cap + aile. main gauche (AZERTY) : Q S D F = tricks.
+   Les codes sont physiques : KeyA/S/D/F = touches Q S D F d'un clavier français. */
+const MAP={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'kup',ArrowDown:'kdown',
+ KeyA:'spin',KeyS:'roll',KeyD:'grab',KeyF:'pass',
+ KeyJ:'spin',KeyK:'roll',KeyL:'grab',KeyM:'pass',
+ Space:'edge',ShiftLeft:'loop',ShiftRight:'loop'};
+addEventListener('keydown',e=>{
+  if(e.code==='KeyR'){restart();e.preventDefault();return;}
+  if(e.repeat)return; const k=MAP[e.code];
+  if(k){setK(k,1);e.preventDefault();}
+  if(PROBE.phase!=='run')begin();
+});
+addEventListener('keyup',e=>{const k=MAP[e.code];if(k){setK(k,0);e.preventDefault();}});
+document.querySelectorAll('[data-k]').forEach(b=>{
+  const k=b.dataset.k;
+  b.addEventListener('pointerdown',e=>{e.preventDefault();if(PROBE.phase!=='run')begin();setK(k,1);
+    try{b.setPointerCapture(e.pointerId)}catch(_){}});
+  const up=e=>{e.preventDefault();setK(k,0)};
+  b.addEventListener('pointerup',up); b.addEventListener('pointercancel',up);
+});
+document.getElementById('veil').addEventListener('pointerdown',e=>{e.preventDefault();begin()});
+
+/* ================= BOUCLE ================= */
+const veil=document.getElementById('veil');
+function begin(){ if(PROBE.phase==='over')restart(); PROBE.phase='run'; veil.style.display='none'; }
+function restart(){
+  PROBE=newState();
+  buoyM.forEach((b,i)=>{b.visible=true;const L=PROBE.letters[i];b.position.set(L.x,heightAt(L.x,L.z)+3.2,L.z)});
+  PROBE.phase='run'; veil.style.display='none';
+}
+
+const el={score:document.querySelector('#hScore b'),combo:document.getElementById('hCombo'),
+ time:document.getElementById('hTime'),let_:document.getElementById('hLet'),
+ trick:document.getElementById('hTrick'),ban:document.getElementById('hBanner'),
+ airEl:document.getElementById('hAir'),
+ pa:document.getElementById('pa'),
+ loop:document.getElementById('loopF'),loopB:document.getElementById('bLoop')};
+const mctx=document.getElementById('mini').getContext('2d');
+const rctx=document.getElementById('rose').getContext('2d');
+
+/* rose des vents : la polaire autour du rider — secteurs rapides en lagon,
+   zone morte face au vent en rose ; l'aiguille = ton cap, la flèche = le vent */
+function rose(G){
+  const S=64,c=S/2;
+  rctx.clearRect(0,0,S,S);
+  rctx.fillStyle='rgba(11,44,66,.82)';
+  rctx.beginPath(); rctx.arc(c,c,30,0,7); rctx.fill();
+  for(let d=0;d<360;d+=8){
+    const h=d*Math.PI/180, e=pointEff(h,G.edging);
+    const a=Math.atan2(Math.cos(h),Math.sin(h));
+    rctx.strokeStyle=e>0.7?'#2ED3E6':e>0.3?'#FFD400':'#FF4FA3';
+    rctx.globalAlpha=0.2+e*0.65;
+    rctx.lineWidth=6;
+    rctx.beginPath(); rctx.arc(c,c,24,a-0.078,a+0.078); rctx.stroke();
+  }
+  rctx.globalAlpha=1;
+  /* le vent souffle vers la droite */
+  rctx.strokeStyle='#F7FBFF'; rctx.lineWidth=2;
+  rctx.beginPath();
+  rctx.moveTo(c-7,c); rctx.lineTo(c+7,c);
+  rctx.moveTo(c+3,c-3.5); rctx.lineTo(c+7,c); rctx.lineTo(c+3,c+3.5);
+  rctx.stroke();
+  if(G.kiteWet){
+    /* aile à l'eau : la rose devient jauge de relance */
+    rctx.strokeStyle='#2ED3E6'; rctx.lineWidth=4;
+    rctx.beginPath(); rctx.arc(c,c,13,-Math.PI/2,-Math.PI/2+G.relaunch*TAU); rctx.stroke();
+  } else {
+    const a=Math.atan2(Math.cos(G.heading),Math.sin(G.heading));
+    rctx.save(); rctx.translate(c,c); rctx.rotate(a);
+    rctx.fillStyle='#F7FBFF';
+    rctx.beginPath(); rctx.moveTo(20,0); rctx.lineTo(8,4.5); rctx.lineTo(8,-4.5);
+    rctx.closePath(); rctx.fill();
+    rctx.restore();
+  }
+}
+
+const camPos=new THREE.Vector3(0,8,20), camAim=new THREE.Vector3();
+let poseCrouch=0;
+const _bl=new THREE.Vector3(), _br=new THREE.Vector3();
+const _tl=new THREE.Vector3(), _tr=new THREE.Vector3();
+const _h=new THREE.Vector3(), _s=new THREE.Vector3();
+const _fl=new THREE.Vector3(), _fr=new THREE.Vector3();
+const _m=new THREE.Matrix4(), _vx=new THREE.Vector3(), _vy=new THREE.Vector3(), _vz=new THREE.Vector3();
+const _p1=new THREE.Vector3(), _p2=new THREE.Vector3(), _d=new THREE.Vector3(), _YUP=new THREE.Vector3(0,1,0);
+let last=performance.now();
+
+function frame(now){
+  let dt=(now-last)/1000; last=now;
+  if(dt>0.05)dt=0.05;
+  const G=PROBE;
+  step(G,KEYS,PRESS,dt);
+
+  if(G.splash){ splashAt(G.splash.x,G.splash.y,G.splash.z); G.splash=null; }
+  if(G.satSplash){ splashAt(G.satSplash.x,G.satSplash.y,G.satSplash.z,10); G.satSplash=null; }
+  poolTick(splash,dt);
+  sprayTick(G,dt);
+  ringTick(dt);
+  trailTick(G);
+
+  /* rider */
+  riderPivot.position.set(G.x,G.y,G.z);
+  rider.rotation.order='YXZ';
+  rider.rotation.y=G.heading+G.spin*Math.PI/180;
+  rider.rotation.x=(G.crashT>0?1.35:(G.sat>0?-0.55:0))+G.roll*Math.PI/180+poseCrouch;
+  /* le rider se suspend à l'aile : gîte contre la traction, côté au vent.
+     cos(cap) inverse le sens à chaque changement d'amure. */
+  const lean=clamp((0.18+G.power*G.eff*0.5+G.load*0.55)*(G.air?0.35:1)*(G.edging?1.5:1),0,0.75)*Math.cos(G.heading);
+  rider.rotation.z=G.crashT>0?Math.sin(G.t*20)*0.25:((G.kiteWet||G.sat>0)?0:lean);
+  rider.position.y=G.crashT>0?-0.25:(G.sat>0?-0.75:(G.kiteWet?-0.3:0));
+  /* cheveux de surfer : soulevés/tirés vers l'arrière par le vent apparent,
+     chaque mèche ondule et fouette (plus la vitesse est haute, plus ça vole). */
+  const blow=clamp(0.12+G.speed*0.022,0,0.8);
+  hairGrp.rotation.x=-0.06-blow*0.25;
+  for(const hl of hairLocks){
+    const w=Math.sin(G.t*7.5+hl.phase)*0.14+Math.sin(G.t*3.4+hl.phase)*0.07;
+    hl.lock.rotation.x=-0.1-blow*0.55+w*0.5;
+    hl.lock.rotation.y=Math.sin(G.t*5.2+hl.phase)*0.13+hl.side*0.25;
+    hl.mid.rotation.x=w+blow*0.3;
+    hl.tip.rotation.x=Math.sin(G.t*9+hl.phase*1.6)*0.28+blow*0.4;
+  }
+  const kv=clamp(G.kiteVel/78,-1,1);   // pilotage de l'AILE (bouger les lignes = ▲▼)
+
+  /* pose : tuck + main au rail pendant un grab, pantin étoile en chute,
+     bras tendus vers l'aile posée à l'eau */
+  let tuck=0, lift=0, crouch=0, tilt=0, yaw=0, aLx=0, aLz=0, aRx=0, aRz=0;
+  if(G.crashT>0){ aLz=1.35; aRz=-1.35; tuck=-1.2; }   // planche à plat, pantin étoile
+  else if(G.sat>0){ tuck=0.85; }                       // assis, jambes/planche devant, fesses dans l'eau
+  else if(G.air&&G.grabHeld){
+    const gp=GRABPOSE[G.grabName]||GRABPOSE['Indy'];
+    /* on relève la planche vers le corps ET on allonge le bras qui saisit : la
+       main vient réellement au contact du rail. */
+    tuck=gp.tuck; lift=0.78; crouch=0.44; tilt=gp.tilt; yaw=gp.yaw;
+    if(gp.hand==='L'){ aLx=gp.ax+0.45; aLz=gp.az; aRx=-0.55; aRz=-1.2; }   // main G saisit, main D stylée
+    else { aRx=gp.ax+0.45; aRz=gp.az; aLx=-0.55; aLz=1.2; }                // main D saisit, main G stylée
+  }
+  else if(G.kiteWet){ aLx=0.5; aRx=0.5; }
+  else {
+    /* en navigation les bras travaillent la BARRE (= pilotent l'aile) : ils tirent
+       avec la charge, et un bras tire plus quand on bouge les lignes (▲▼). PAS de
+       réaction à ◀▶ : la direction, c'est la planche/le carving, pas la barre. */
+    const pull=clamp(G.load*0.5+(KEYS.kup?0.25:0),0,0.7);
+    aLx=0.1+pull+kv*0.14; aRx=0.1+pull-kv*0.14;
+  }
+  const pk=1-Math.pow(0.0005,dt);
+  poseCrouch+=(crouch-poseCrouch)*pk;
+  lowerGrp.rotation.x+=(tuck-lowerGrp.rotation.x)*pk;
+  lowerGrp.rotation.y+=(yaw-lowerGrp.rotation.y)*pk;
+  lowerGrp.rotation.z+=(tilt-lowerGrp.rotation.z)*pk;
+  lowerGrp.position.y+=((1.02+lift)-lowerGrp.position.y)*pk;
+  armLGrp.rotation.x+=(aLx-armLGrp.rotation.x)*pk;
+  armLGrp.rotation.z+=(aLz-armLGrp.rotation.z)*pk;
+  armRGrp.rotation.x+=(aRx-armRGrp.rotation.x)*pk;
+  armRGrp.rotation.z+=(aRz-armRGrp.rotation.z)*pk;
+
+  /* la barre pilote l'AILE : elle roule quand on bouge les lignes (▲▼) et se borde
+     sous la charge — elle NE réagit PAS au cap (◀▶ = planche). */
+  {
+    const active=G.crashT<=0&&!G.sat&&!G.kiteWet;
+    const trimIn=clamp(G.load*0.5+(KEYS.kup?0.3:0),0,0.85);
+    const barZ=active?0.5-trimIn*0.13:0.5;
+    const barRoll=active?kv*0.4:0;
+    barMesh.position.z+=(barZ-barMesh.position.z)*pk;
+    barMesh.position.y+=((1.48-trimIn*0.05)-barMesh.position.y)*pk;
+    barMesh.rotation.z+=(barRoll-barMesh.rotation.z)*pk;
+  }
+  /* stance de kite : le buste se tourne de profil vers l'aile (côté du vent, +X)
+     pendant qu'on navigue ; neutre en l'air pour des rotations propres. */
+  {
+    let face=Math.PI/2-G.heading; face=((face+Math.PI)%TAU+TAU)%TAU-Math.PI;
+    const target=(G.air||G.crashT>0||G.sat>0)?0:clamp(face,-1.0,1.0)*0.7;
+    upperGrp.rotation.y+=(target-upperGrp.rotation.y)*pk*0.6;
+  }
+
+  /* ombre portée */
+  {
+    const gy=heightAt(G.x,G.z);
+    shadow.position.set(G.x,gy+0.07,G.z);
+    const h=Math.max(0,G.y-gy);
+    const s=clamp(1.35-h*0.055,0.35,1.35);
+    shadow.scale.set(s,s,s);
+    shadow.material.opacity=0.3*clamp(1-h/14,0.2,1);
+  }
+
+  /* aile : sur la sphère dans le plan du vent — ou posée sur l'eau.
+     Orientation par base orthonormée : envergure across the wind (Z monde),
+     concavité vers le rider, bord d'attaque face au vent. */
+  if(G.kiteWet){
+    kite.position.set(G.x+12,heightAt(G.x+12,G.z)+0.15,G.z);
+    kite.rotation.set(Math.PI/2*(1-0.65*G.relaunch),0,Math.sin(G.t*1.6)*0.06);
+  } else {
+    const a=G.kite*Math.PI/180, ca=Math.cos(a), sa=Math.sin(a);
+    kite.position.set(G.x+ca*12, G.y+1.6+sa*12, G.z);
+    /* bank : au zénith l'envergure (et le boudin) est horizontale ; en descendant
+       dans la fenêtre l'aile banque sur le côté, l'envergure passe vers la verticale. */
+    const bankT=clamp((72-G.kite)/72,0,1);
+    const bank=bankT*bankT*1.32;
+    _vx.set(0,-Math.sin(bank),Math.cos(bank));   // envergure : Z → verticale quand l'aile descend (boudin du bon côté)
+    _vy.set(ca,sa,0);                            // radial (les lignes)
+    _vy.addScaledVector(_vx,-_vy.dot(_vx)).normalize();   // « haut » perpendiculaire à l'envergure
+    _vz.crossVectors(_vx,_vy);                   // corde / bord d'attaque
+    _m.makeBasis(_vx,_vy,_vz);
+    kite.quaternion.setFromRotationMatrix(_m);
+  }
+  riderPivot.updateMatrixWorld(true);
+  kite.updateMatrixWorld(true);
+
+  /* GRAB : la main qui saisit est posée directement sur le rail de la planche, et un
+     bras dessiné la relie à l'épaule → on VOIT la main tenir la planche. */
+  if(G.air&&G.grabHeld){
+    const gp=GRABPOSE[G.grabName]||GRABPOSE['Indy'], L=gp.hand==='L';
+    _p1.set(L?-0.27:0.27,1.72,0.16); upperGrp.localToWorld(_p1); rider.worldToLocal(_p1);   // épaule
+    _p2.set(gp.tilt>0?-0.17:0.17,-0.93,0.12); lowerGrp.localToWorld(_p2); rider.worldToLocal(_p2); // rail
+    grabHand.position.copy(_p2); grabHand.visible=true;
+    _d.subVectors(_p2,_p1); const Ld=Math.max(0.05,_d.length());
+    grabArm.position.copy(_p1).addScaledVector(_d,0.5);
+    grabArm.scale.set(1,Ld/0.4,1);
+    grabArm.quaternion.setFromUnitVectors(_YUP,_d.clone().normalize());
+    grabArm.visible=true;
+    (L?armLGrp:armRGrp).visible=false; (L?armRGrp:armLGrp).visible=true;
+  } else if(grabArm.visible){
+    grabArm.visible=false; grabHand.visible=false; armLGrp.visible=true; armRGrp.visible=true;
+  }
+
+  /* lignes : Y avant depuis le chicken-loop + 2 arrière vers les oreilles */
+  _h.set(0,1.12,0.35);  rider.localToWorld(_h);   // chicken-loop au harnais
+  _s.set(0,1.55,0.72);  rider.localToWorld(_s);   // point de division du Y
+  _bl.set(-0.56,0,0); barMesh.localToWorld(_bl);  // vrai bout GAUCHE de la barre (animée)
+  _br.set( 0.56,0,0); barMesh.localToWorld(_br);  // vrai bout DROIT
+  _fl.set(-1.3,-0.2,0.7); kite.localToWorld(_fl); // bord d'attaque, côté gauche
+  _fr.set( 1.3,-0.2,0.7); kite.localToWorld(_fr);
+  _tl.set(-3.3,-1.5,0); kite.localToWorld(_tl);
+  _tr.set( 3.3,-1.5,0); kite.localToWorld(_tr);
+  /* apparie chaque côté de l'aile au même côté du rider : lignes jamais croisées */
+  if(_bl.distanceToSquared(_tl)+_br.distanceToSquared(_tr) >
+     _bl.distanceToSquared(_tr)+_br.distanceToSquared(_tl)){
+    let t=_tl.x;_tl.x=_tr.x;_tr.x=t; t=_tl.y;_tl.y=_tr.y;_tr.y=t; t=_tl.z;_tl.z=_tr.z;_tr.z=t;
+    t=_fl.x;_fl.x=_fr.x;_fr.x=t; t=_fl.y;_fl.y=_fr.y;_fr.y=t; t=_fl.z;_fl.z=_fr.z;_fr.z=t;
+  }
+  const lp=lines.geometry.attributes.position;
+  lp.setXYZ(0,_h.x,_h.y,_h.z);    lp.setXYZ(1,_s.x,_s.y,_s.z);
+  lp.setXYZ(2,_s.x,_s.y,_s.z);    lp.setXYZ(3,_fl.x,_fl.y,_fl.z);
+  lp.setXYZ(4,_s.x,_s.y,_s.z);    lp.setXYZ(5,_fr.x,_fr.y,_fr.z);
+  lp.setXYZ(6,_bl.x,_bl.y,_bl.z); lp.setXYZ(7,_tl.x,_tl.y,_tl.z);
+  lp.setXYZ(8,_br.x,_br.y,_br.z); lp.setXYZ(9,_tr.x,_tr.y,_tr.z);
+  lp.needsUpdate=true;
+  lineMat.color.setHex(G.kiteWet?0x9fb4c0:(G.load>0.85?0xFFD400:0xeef8fc));
+
+  /* caméra chase : cadrée haut pour garder l'aile dans le champ.
+     (mode photo pour inspecter le rider de près : window.KITELINE.photo) */
+  if(window.KITELINE&&window.KITELINE.photo){
+    /* vue rapprochée DERRIÈRE le rider (comme la caméra de jeu) pour juger la pose */
+    cam.position.set(G.x-Math.sin(G.heading)*2.8+Math.cos(G.heading)*1.3, G.y+1.9, G.z-Math.cos(G.heading)*2.8-Math.sin(G.heading)*1.3);
+    cam.lookAt(G.x,G.y+1.05,G.z);
+  } else {
+  const kiteY=G.kiteWet?0:1.6+Math.sin(G.kite*Math.PI/180)*12;
+  const back=8+G.speed*0.20, up=4.2+G.y*0.12+(G.air?1.2:0);
+  camPos.set(G.x-Math.sin(G.heading)*back, G.y+up, G.z-Math.cos(G.heading)*back);
+  cam.position.lerp(camPos,1-Math.pow(0.0016,dt));
+  camAim.set(G.x+Math.sin(G.heading)*5.5, G.y+1.6+Math.max(0,kiteY-1.6)*0.32, G.z+Math.cos(G.heading)*5.5);
+  cam.lookAt(camAim);
+  }
+
+  /* ciel accroché à la caméra, soleil au loin, nuages qui dérivent */
+  skyDome.position.set(cam.position.x,0,cam.position.z);
+  sunDisc.position.copy(cam.position).addScaledVector(SUNDIR,380);
+  sunDisc.lookAt(cam.position);
+  for(const c of clouds){
+    c.position.x+=dt*2.1;
+    if(c.position.x>G.x+300) c.position.x-=600;
+    if(c.position.z>G.z+300) c.position.z-=600;
+    if(c.position.z<G.z-300) c.position.z+=600;
+  }
+
+  /* houle animée côté GPU */
+  /* l'eau détaillée suit le rider (recentrée sur la grille) → océan sans fin */
+  waterMesh.position.x=Math.round(G.x/WCELL)*WCELL;
+  waterMesh.position.z=Math.round(G.z/WCELL)*WCELL;
+  farSea.position.x=G.x; farSea.position.z=G.z;
+  if(waterMat.userData.shader){
+    waterMat.userData.shader.uniforms.uT.value=G.t;
+    waterMat.userData.shader.uniforms.uOff.value.set(waterMesh.position.x,waterMesh.position.z);
+  }
+  if(trail.m.material.userData.shader) trail.m.material.userData.shader.uniforms.uT.value=G.t;
+
+  /* écume : sur les crêtes de houle et les zones de déferlement seulement,
+     masquée sous la caméra (gros carrés) */
+  const fp=foam.geometry.attributes.position;
+  for(let i=0;i<fp.count;i++){
+    let x=fp.getX(i)+dt*2.4;
+    if(x>G.x+285) x-=570;
+    if(x<G.x-285) x+=570;
+    let z=fp.getZ(i);
+    if(z>G.z+285) z-=570; if(z<G.z-285) z+=570;
+    fp.setX(i,x); fp.setZ(i,z);
+    const st=staticH(x,z), sw=swell(x,z);
+    const breaking=(st>1.2&&st<3.4)||sw>0.52;
+    const dcx=x-cam.position.x, dcz=z-cam.position.z;
+    fp.setY(i,(!breaking||dcx*dcx+dcz*dcz<110)?-999:st+sw+0.12);
+  }
+  fp.needsUpdate=true;
+
+  buoyM.forEach((b,i)=>{
+    if(G.letters[i].got){ b.visible=false; return; }
+    b.position.y=heightAt(b.position.x,b.position.z)+3.2+Math.sin(G.t*2.4+i)*0.3;
+    b.rotation.y=G.t*0.9+i*1.6;
+  });
+
+  hud(G);
+  renderer.render(scene,cam);
+  requestAnimationFrame(frame);
+}
+
+function mini(G){
+  const S=84, sc=S/560, o=S/2;
+  const px=x=>o+x*sc, pz=z=>o+z*sc;
+  mctx.fillStyle='rgba(11,44,66,.8)'; mctx.fillRect(0,0,S,S);
+  mctx.strokeStyle='rgba(247,251,255,.5)'; mctx.lineWidth=2;
+  for(const f of FEAT){
+    if(f.t==='ridge'){ mctx.beginPath(); mctx.moveTo(px(f.x0),pz(f.z)); mctx.lineTo(px(f.x1),pz(f.z)); mctx.stroke(); }
+  }
+  mctx.fillStyle='#8a6a45'; mctx.fillRect(px(PIER.x0)-1,pz(PIER.z0),3,(PIER.z1-PIER.z0)*sc);
+  mctx.fillStyle='#E9D8B4'; mctx.beginPath(); mctx.arc(px(170),pz(150),6,0,7); mctx.fill();
+  mctx.fillStyle='#FFD400';
+  for(const L of G.letters) if(!L.got) mctx.fillRect(px(L.x)-1,pz(L.z)-1,3,3);
+  /* le rider : la flèche montre TOUJOURS le cap (direction où l'on va) ; hors carte
+     elle se colle au bord et la distance à l'île s'affiche pour retrouver le spot. */
+  let rx=px(G.x), rz=pz(G.z);
+  const off=rx<3||rx>S-3||rz<3||rz>S-3;
+  rx=clamp(rx,5,S-5); rz=clamp(rz,5,S-5);
+  mctx.save(); mctx.translate(rx,rz);
+  mctx.rotate(Math.atan2(Math.cos(G.heading),Math.sin(G.heading)));   // orientée sur le CAP
+  mctx.fillStyle='#FF4FA3';
+  mctx.beginPath(); mctx.moveTo(5,0); mctx.lineTo(-3.5,3.2); mctx.lineTo(-3.5,-3.2); mctx.closePath(); mctx.fill();
+  mctx.restore();
+  if(off){
+    /* petit repère séparé vers l'île + distance */
+    mctx.save(); mctx.translate(rx,rz); mctx.rotate(Math.atan2(pz(150)-rz,px(170)-rx));
+    mctx.strokeStyle='#FFD400'; mctx.lineWidth=1.5;
+    mctx.beginPath(); mctx.moveTo(6,0); mctx.lineTo(10,0); mctx.stroke(); mctx.restore();
+    mctx.fillStyle='#F7FBFF'; mctx.font='9px ui-monospace,monospace'; mctx.textAlign='center';
+    mctx.fillText(Math.round(Math.hypot(G.x-170,G.z-150))+'m', o, S-3);
+  } else {
+    mctx.strokeStyle='#2ED3E6'; mctx.lineWidth=1;
+    mctx.beginPath(); mctx.moveTo(6,S-7); mctx.lineTo(15,S-7); mctx.lineTo(12,S-10); mctx.stroke();
+  }
+}
+
+function hud(G){
+  el.score.textContent=G.score.toLocaleString('fr-FR');
+  el.combo.textContent=G.mult>0?(G.pot+'  x'+G.mult):'';
+  const m=Math.floor(G.time/60),s=Math.floor(G.time%60);
+  el.time.textContent=m+':'+String(s).padStart(2,'0');
+  el.time.style.color=G.time<20?'#FF4FA3':'#F7FBFF';
+  el.let_.innerHTML=['K','I','T','E'].map((c,i)=>
+    '<span style="color:'+(G.letters[i].got?'#FFD400':'#4a6b7e')+'">'+c+'</span>').join('');
+  el.trick.textContent=(G.air&&(G.grabHeld||G.grabsDone.length))
+    ?(G.grabsDone.map(g=>g.name).join(' > ')+(G.grabHeld?(G.grabsDone.length?' > ':'')+G.grabName+' …':''))
+    :(G.trickT>0?G.trick:'');
+  el.ban.textContent=G.bannerT>0?G.banner:'';
+  el.ban.style.color=G.bannerGood?'#FFD400':'#FF4FA3';
+  /* décompte de hang time + hauteur à partir de 2 s de vol */
+  el.airEl.textContent=(G.air&&G.airT>=2)
+    ?'✦ '+G.airT.toFixed(1)+' s · '+Math.round(G.maxH)+' m':'';
+  el.pa.textContent=G.kiteWet?'--':Math.round(pointAngle(G.heading));
+  rose(G);
+  el.loop.style.width=G.special+'%';
+  el.loopB.classList.toggle('rdy',G.special>=100);
+  mini(G);
+  if(G.phase==='over'&&veil.style.display==='none'){
+    const g=G.goals;
+    veil.innerHTML='<h1>FIN DE RUN</h1><p style="font-size:clamp(14px,2.9cqw,34px);color:#FFD400;opacity:1">'
+      +G.score.toLocaleString('fr-FR')+'</p><p>meilleur combo '+G.best.toLocaleString('fr-FR')+'</p><p style="text-align:left">'
+      +[['40 000 points',g.score],['les 4 bouées K-I-T-E',g.letters],['glisser sur le ponton',g.pier],
+        ['2,2 s en l\'air',g.air],['remonter tout au vent',g.upwind]]
+        .map(r=>(r[1]?'<span style="color:#FFD400">☑ ':'<span style="color:#4a6b7e">☐ ')+r[0]+'</span>').join('<br>')
+      +'</p><div class="go">TOUCHE POUR REJOUER</div>';
+    veil.style.display='flex';
+    veil.addEventListener('pointerdown',e=>{e.preventDefault();restart()},{once:true});
+  }
+}
+
+function fit(){
+  const desktop=innerWidth>=760;
+  const maxW=desktop?innerWidth-16:Math.min(innerWidth,600);
+  const maxH=innerHeight*(desktop?0.93:0.60);
+  const ww=Math.min(maxW,maxH*AR), wh=ww/AR;
+  stage.style.width=ww+'px';
+  renderer.setSize(ww,wh);           // rend à la taille affichée × DPR (net)
+  cam.aspect=ww/wh; cam.updateProjectionMatrix();
+}
+addEventListener('resize',fit); fit();
+requestAnimationFrame(frame);
+
+/* ================= API DE TEST (Cypress) ================= */
+window.KITELINE={
+  get G(){return PROBE}, set G(v){PROBE=v},
+  KEYS,PRESS,MAP,setK,begin,restart,
+  step:d=>step(PROBE,KEYS,PRESS,d||1/60),
+  heightAt,staticH,pointAngle,pointEff,
+  kiteFall:()=>kiteFall(PROBE),
+  RIG, photo:null,
+  newState, version:'v5'
+};
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>KITELINE — trick engine prototype</title>
+<style>
+  :root{
+    --deep:#0d2b47;
+    --ink:#061726;
+    --foam:#dff2ec;
+    --sun:#ffb45e;
+    --hot:#ff4f58;
+    --gold:#ffd23f;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%}
+  body{
+    background:var(--ink);
+    color:var(--foam);
+    font-family:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+    display:flex;flex-direction:column;align-items:center;
+    overflow:hidden;
+    touch-action:none;
+    user-select:none;
+  }
+  #screen{
+    width:100%;
+    background:#000;
+    display:block;
+    flex:0 0 auto;
+    position:relative;
+  }
+  canvas{
+    display:block;width:100%;height:auto;
+    image-rendering:pixelated;
+    image-rendering:crisp-edges;
+  }
+  #pad{
+    flex:1 1 auto;width:100%;max-width:560px;
+    display:grid;
+    grid-template-columns:1fr 1.35fr;
+    gap:10px;
+    padding:12px;
+    align-items:stretch;
+  }
+  .col{display:grid;gap:8px}
+  .left{grid-template-rows:1fr 1fr}
+  .right{grid-template-columns:1fr 1fr 1fr;grid-template-rows:1fr 1fr}
+  button{
+    font-family:inherit;font-size:11px;font-weight:700;letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--foam);
+    background:#10314e;
+    border:1px solid #1e5578;
+    border-bottom-width:3px;
+    border-radius:3px;
+    padding:14px 4px;
+    min-height:46px;
+    transition:none;
+  }
+  button.on{background:#1e6b8c;border-color:#35a8b0;color:#fff;transform:translateY(1px);border-bottom-width:1px}
+  button[data-k="edge"]{grid-column:1 / -1;background:#153d5e;border-color:#2b7fa6;color:var(--gold)}
+  button[data-k="edge"].on{background:#2b7fa6;color:#fff}
+  button[data-k="loop"]{color:var(--hot);border-color:#5c2230;background:#2a1220}
+  button[data-k="loop"].ready{background:#7a1b28;border-color:var(--hot);color:#fff}
+  .hint{font-size:9px;letter-spacing:.1em;opacity:.45;padding:0 12px 10px;text-align:center;line-height:1.6}
+  @media (min-width:700px){ #pad{display:none} .hint{padding-top:10px} }
+</style>
+</head>
+<body>
+
+<div id="screen"><canvas id="c" width="320" height="200"></canvas></div>
+
+<div id="pad">
+  <div class="col left">
+    <button data-k="up">▲ Kite up</button>
+    <button data-k="down">▼ Kite down</button>
+  </div>
+  <div class="col right">
+    <button data-k="spin">Spin</button>
+    <button data-k="grab">Grab</button>
+    <button data-k="pass">Pass</button>
+    <button data-k="edge">Hold to edge · release to pop</button>
+  </div>
+</div>
+<div class="hint">Keyboard: W/S kite · SPACE edge+pop · J spin · K grab · L pass · SHIFT loop · R restart</div>
+
+<script>
+(function(){
+"use strict";
+
+const cv = document.getElementById('c');
+const ctx = cv.getContext('2d', {alpha:false});
+ctx.imageSmoothingEnabled = false;
+const W = 320, H = 200;
+const HORIZON = 76;
+const RIDER_X = 96;
+const GRAV = 540;
+
+/* ---------- palette (16 colours, PS1 lagoon at golden hour) ---------- */
+const P = {
+  sky0:'#2f4d8f', sky1:'#4a72ad', sky2:'#7fa3cc', sky3:'#c9b6a8',
+  sky4:'#f0c07c', sun:'#ff9e5e',
+  land:'#4b3f52', land2:'#5f5065',
+  far:'#2a6d86', mid:'#1e6b8c', deep:'#123a5c', dark:'#0b263d',
+  foam:'#dff2ec', foam2:'#8ecfd0',
+  hot:'#ff4f58', gold:'#ffd23f', white:'#f2f2f0', skin:'#e0a071', suit:'#1b2b3a'
+};
+
+/* ---------- input ---------- */
+const KEYS = {up:0,down:0,edge:0,spin:0,grab:0,pass:0,loop:0};
+const PRESSED = {};
+function setKey(k,v){
+  if(!(k in KEYS)) return;
+  if(v && !KEYS[k]) PRESSED[k]=1;
+  KEYS[k]=v?1:0;
+  const b=document.querySelector('button[data-k="'+k+'"]');
+  if(b) b.classList.toggle('on',!!v);
+}
+const KEYMAP={KeyW:'up',ArrowUp:'up',KeyS:'down',ArrowDown:'down',Space:'edge',
+  KeyJ:'spin',KeyK:'grab',KeyL:'pass',ShiftLeft:'loop',ShiftRight:'loop'};
+addEventListener('keydown',e=>{
+  if(e.code==='KeyR'){reset();e.preventDefault();return;}
+  if(e.repeat) return;
+  const k=KEYMAP[e.code]; if(k){setKey(k,1);e.preventDefault();}
+  if(G.phase!=='run') start();
+});
+addEventListener('keyup',e=>{const k=KEYMAP[e.code]; if(k){setKey(k,0);e.preventDefault();}});
+
+document.querySelectorAll('#pad button').forEach(b=>{
+  const k=b.dataset.k;
+  const down=e=>{e.preventDefault(); if(G.phase!=='run'){start();} setKey(k,1); b.setPointerCapture&&b.setPointerCapture(e.pointerId);};
+  const up=e=>{e.preventDefault(); setKey(k,0);};
+  b.addEventListener('pointerdown',down);
+  b.addEventListener('pointerup',up);
+  b.addEventListener('pointercancel',up);
+});
+cv.addEventListener('pointerdown',e=>{e.preventDefault(); if(G.phase!=='run') start();});
+
+/* ---------- world ---------- */
+const GRABS=['Melon','Indy','Stalefish','Nuclear','Tail Grab','Slob','Seatbelt'];
+const ROLLS={1:'Half Roll',2:'Backroll',3:'Backroll to Blind',4:'Double Backroll',
+             5:'Double to Blind',6:'Triple Backroll',7:'Triple to Blind',8:'Quad Backroll'};
+
+let G;
+function reset(){
+  G={
+    phase:'title', t:0, time:120,
+    x:0, y:0, vy:0, speed:60, air:false, airT:0,
+    kite:95, power:0, load:0, edging:false, wasEdge:false,
+    rot:0, spinning:false, grabT:0, grabHeld:false, grabName:'', passes:0, passCD:0,
+    score:0, comboPot:0, comboMult:0, comboT:0, best:0,
+    special:0, loopT:0, loopBoost:0,
+    trickText:'', trickTimer:0, bailT:0,
+    lips:[], nextLip:520, letters:[], got:{K:0,I:0,T:0,E:0},
+    pops:[], spray:[], banner:'', bannerT:0,
+    goals:{score:0, letters:0, dbl:0, air:0}, maxAir:0
+  };
+  for(let i=0;i<8;i++) growWorld();
+}
+function growWorld(){
+  const x=G.nextLip;
+  const h=13+Math.random()*24;
+  G.lips.push({x,h});
+  const li=['K','I','T','E'][G.lips.length%4];
+  if(G.lips.length%3===1) G.letters.push({x:x+30, y:-(46+Math.random()*46), c:li, got:false});
+  G.nextLip = x + 380 + Math.random()*420;
+}
+function start(){ if(G.phase==='over'){reset();} G.phase='run'; }
+
+function surfaceY(x){
+  let y = 138 + Math.sin(x*0.0061)*6 + Math.sin(x*0.0137+2)*3.2;
+  for(let i=0;i<G.lips.length;i++){
+    const L=G.lips[i]; const d=(x-L.x)/34;
+    if(d>-3.2&&d<3.2) y -= L.h*Math.exp(-d*d);
+  }
+  return y;
+}
+function powerAt(a){
+  const t=(a-38)/70;
+  if(t<-1||t>1) return 0;
+  return Math.cos(t*Math.PI/2);
+}
+/* lift is a different curve than pull: you get height by SENDING the kite up,
+   not by parking it low in the power zone. This is what forces the real rhythm —
+   fly low for speed, edge hard, send it, pop, bring it back down to land. */
+function liftAt(a){
+  const t=(a-72)/48;
+  if(t<-1||t>1) return 0;
+  return Math.cos(t*Math.PI/2);
+}
+
+/* ---------- update ---------- */
+function update(dt){
+  G.t+=dt;
+  if(G.phase!=='run'){ for(const k in PRESSED) delete PRESSED[k]; return; }
+
+  G.time-=dt;
+  if(G.time<=0){ G.time=0; bankCombo(); G.phase='over'; }
+
+  /* kite steering */
+  const rate=78;
+  if(G.loopT>0){
+    G.loopT-=dt;
+    const p=1-G.loopT/1.0;
+    G.kite = 92 - 92*Math.sin(Math.min(1,p*1.6)*Math.PI*0.5) + (p>0.62?(p-0.62)*260:0);
+    if(G.loopT<=0){ G.kite=Math.max(30,Math.min(150,G.kite)); }
+  } else {
+    if(KEYS.up) G.kite+=rate*dt;
+    else if(KEYS.down) G.kite-=rate*dt;
+    else G.kite += Math.sign(56-G.kite)*Math.min(12*dt, Math.abs(56-G.kite));
+    G.kite=Math.max(15,Math.min(165,G.kite));
+  }
+  G.power=powerAt(G.kite);
+
+  /* loop trigger */
+  if(PRESSED.loop && G.special>=100 && G.loopT<=0){
+    G.special=0; G.loopT=1.0; G.loopBoost=1;
+    G.speed+=95; if(G.air) G.vy-=175;
+    banner('KITE LOOP');
+  }
+
+  /* drive */
+  const target = 40 + G.power*205 + (G.loopT>0?90:0);
+  G.speed += (target-G.speed)*1.4*dt;
+
+  G.edging = !!KEYS.edge && !G.air;
+  if(G.edging){
+    G.load = Math.min(1.25, G.load + (0.55+G.power*0.9)*(0.35+G.speed/240)*1.15*dt);
+    G.speed -= (34+G.load*38)*dt;
+    if(Math.random()<dt*40) G.spray.push({x:G.x,y:surfaceY(G.x),vx:-30-Math.random()*70,vy:-20-Math.random()*45,l:0.5});
+  } else if(!G.air){
+    G.load = Math.max(0, G.load - 2.6*dt);
+  }
+  G.speed=Math.max(18,G.speed);
+
+  /* pop on edge release */
+  if(G.wasEdge && !KEYS.edge && !G.air){
+    const sl=(surfaceY(G.x+7)-surfaceY(G.x-7))/14;
+    const ramp=Math.max(0,Math.min(1.3,-sl));
+    const lift=liftAt(G.kite);
+    if(G.load>0.12 || ramp>0.25){
+      G.vy = -(52 + G.load*100 + G.load*lift*180 + lift*46 + ramp*74);
+      G.speed += G.load*34;
+      G.air=true; G.airT=0; G.rot=0; G.grabT=0; G.passes=0;
+      G.grabName=GRABS[(Math.random()*GRABS.length)|0];
+      splash(G.x,surfaceY(G.x),8);
+    }
+    G.load=0;
+  }
+  G.wasEdge=!!KEYS.edge;
+
+  /* motion */
+  G.x += G.speed*dt;
+  if(G.x+900>G.nextLip) growWorld();
+
+  if(G.air){
+    G.airT+=dt;
+    G.maxAir=Math.max(G.maxAir,G.airT);
+    G.vy+=GRAV*dt;
+    G.y+=G.vy*dt;
+    if(KEYS.spin) G.rot += 440*dt;
+    G.grabHeld=!!KEYS.grab;
+    if(G.grabHeld) G.grabT+=dt;
+    G.passCD-=dt;
+    if(PRESSED.pass && G.passCD<=0 && G.airT>0.28 && G.passes<3){ G.passes++; G.passCD=0.26; }
+    const sy=surfaceY(G.x);
+    if(G.y>=sy-3 && G.vy>0){ land(sy); }
+  } else {
+    G.y = surfaceY(G.x)-3;
+    G.rot=0;
+  }
+
+  /* combo decay — carving keeps it alive (the manual) */
+  if(G.comboMult>0){
+    if(G.air || G.edging) G.comboT = Math.max(G.comboT, 0.9);
+    else G.comboT -= dt;
+    if(G.comboT<=0) bankCombo();
+  }
+
+  /* letters */
+  for(const L of G.letters){
+    if(L.got) continue;
+    const ly=surfaceY(L.x)+L.y;
+    if(Math.abs(L.x-G.x)<11 && Math.abs(ly-G.y)<14){
+      L.got=true; G.got[L.c]=1; banner('LETTER '+L.c);
+      if(G.got.K&&G.got.I&&G.got.T&&G.got.E) G.goals.letters=1;
+    }
+  }
+
+  /* fx */
+  for(let i=G.spray.length-1;i>=0;i--){
+    const s=G.spray[i]; s.l-=dt; s.x+=s.vx*dt; s.y+=s.vy*dt; s.vy+=260*dt;
+    if(s.l<=0) G.spray.splice(i,1);
+  }
+  for(let i=G.pops.length-1;i>=0;i--){ G.pops[i].l-=dt; G.pops[i].y-=22*dt; if(G.pops[i].l<=0) G.pops.splice(i,1); }
+  G.trickTimer-=dt; G.bannerT-=dt; G.bailT-=dt;
+
+  for(const k in PRESSED) delete PRESSED[k];
+}
+function splash(x,y,n){ for(let i=0;i<n;i++) G.spray.push({x,y,vx:(Math.random()-0.5)*130,vy:-40-Math.random()*90,l:0.45}); }
+function banner(s){ G.banner=s; G.bannerT=1.1; }
+
+function land(sy){
+  G.air=false; G.y=sy-3; G.vy=0;
+  const half=Math.round(G.rot/180);
+  const off=Math.abs(G.rot-half*180);
+  let fail='';
+  if(off>44) fail='ROTATION';
+  else if(G.grabHeld) fail='GRAB HELD';
+  else if(G.kite<26||G.kite>110) fail='KITE OUT OF WINDOW';
+
+  if(fail){
+    G.trickText=''; G.bailT=1.3; G.banner='BAIL — '+fail; G.bannerT=1.3;
+    G.comboPot=0; G.comboMult=0; G.comboT=0;
+    G.speed*=0.35; G.load=0; splash(G.x,sy,16);
+    return;
+  }
+
+  /* score the air */
+  const parts=[];
+  let pts=Math.round(G.airT*70);
+  if(half>=1){ parts.push(ROLLS[Math.min(8,half)]||(half*180+'')); pts+=Math.round(Math.pow(half,1.42)*135); }
+  if(G.grabT>0.12){ parts.push(G.grabName); pts+=Math.round(45+G.grabT*95); }
+  if(G.passes>0){ parts.push(G.passes>1?G.passes+'x Handle Pass':'Handle Pass'); pts+=G.passes*265; }
+  if(G.loopBoost){ parts.push('Looped'); pts=Math.round(pts*2); G.loopBoost=0; }
+  if(parts.length===0) parts.push('Jump');
+
+  G.trickText=parts.join(' + ');
+  G.trickTimer=2.4;
+  G.comboPot+=pts; G.comboMult++; G.comboT=1.5;
+  G.special=Math.min(100,G.special+pts/26);
+  G.pops.push({x:G.x,y:G.y-24,txt:'+'+pts,l:1.1});
+  splash(G.x,sy,10);
+
+  if(half>=4) G.goals.dbl=1;
+  if(G.airT>2.2) G.goals.air=1;
+}
+function bankCombo(){
+  if(G.comboMult>0){
+    const total=G.comboPot*G.comboMult;
+    G.score+=total;
+    G.best=Math.max(G.best,total);
+    if(G.score>=25000) G.goals.score=1;
+  }
+  G.comboPot=0; G.comboMult=0; G.comboT=0;
+}
+
+/* ---------- drawing helpers ---------- */
+function px(x,y,w,h,c){ ctx.fillStyle=c; ctx.fillRect(x|0,y|0,w|0,h|0); }
+function checker(x,y,w,h,c,off){
+  ctx.fillStyle=c;
+  for(let j=0;j<h;j++) for(let i=(j+ (off||0))%2;i<w;i+=2) ctx.fillRect((x+i)|0,(y+j)|0,1,1);
+}
+function text(s,x,y,c,size){
+  ctx.font=(size||8)+'px ui-monospace,monospace';
+  ctx.textBaseline='top';
+  ctx.fillStyle=c; ctx.fillText(s,x|0,y|0);
+}
+
+/* ---------- render ---------- */
+function draw(){
+  const cam=G.x-RIDER_X;
+
+  /* sky bands with dithered seams */
+  const bands=[[0,20,P.sky0],[20,34,P.sky1],[34,50,P.sky2],[50,63,P.sky3],[63,HORIZON,P.sky4]];
+  for(const b of bands) px(0,b[0],W,b[1]-b[0],b[2]);
+  checker(0,18,W,4,P.sky1); checker(0,32,W,4,P.sky2);
+  checker(0,48,W,4,P.sky3); checker(0,61,W,4,P.sky4);
+
+  /* sun */
+  const sx=250, sy=54;
+  ctx.fillStyle=P.sun;
+  ctx.beginPath(); ctx.arc(sx,sy,13,0,Math.PI*2); ctx.fill();
+  checker(sx-19,sy-19,38,38,P.sun);
+
+  /* far headland, slow parallax */
+  const px0=-((cam*0.12)%520);
+  for(let r=0;r<2;r++){
+    const bx=px0+r*520;
+    ctx.fillStyle=P.land;
+    ctx.beginPath();
+    ctx.moveTo(bx-40,HORIZON);
+    ctx.lineTo(bx+30,HORIZON-13); ctx.lineTo(bx+72,HORIZON-6);
+    ctx.lineTo(bx+120,HORIZON-17); ctx.lineTo(bx+190,HORIZON-4);
+    ctx.lineTo(bx+240,HORIZON);
+    ctx.closePath(); ctx.fill();
+  }
+
+  /* water body */
+  px(0,HORIZON,W,H-HORIZON,P.far);
+  px(0,HORIZON+16,W,H-HORIZON-16,P.mid);
+  checker(0,HORIZON+12,W,6,P.mid);
+  px(0,132,W,H-132,P.deep);
+  checker(0,127,W,6,P.deep);
+
+  /* distant chop lines */
+  for(let i=0;i<26;i++){
+    const y=HORIZON+3+ (i*i)*0.09;
+    const off=((-cam*(0.2+i*0.02))% 40 +40)%40;
+    for(let x=-40;x<W;x+=40) px(x+off,y,7,1,P.foam2);
+  }
+
+  /* swell surface */
+  ctx.fillStyle=P.deep;
+  ctx.beginPath(); ctx.moveTo(0,H);
+  for(let x=0;x<=W;x+=2) ctx.lineTo(x,surfaceY(cam+x));
+  ctx.lineTo(W,H); ctx.closePath(); ctx.fill();
+
+  /* foam crest */
+  for(let x=0;x<W;x+=1){
+    const y=surfaceY(cam+x);
+    px(x,y-1,1,2,P.foam2);
+    const sl=(surfaceY(cam+x+6)-surfaceY(cam+x-6))/12;
+    if(sl<-0.22) px(x,y-2,1,2,P.foam);
+  }
+  /* dithered water texture */
+  for(let x=0;x<W;x+=2){
+    const y=surfaceY(cam+x);
+    checker(x,y+5,2,3,P.mid,(x+((cam*0.5)|0))%2);
+  }
+
+  /* letters */
+  for(const L of G.letters){
+    if(L.got) continue;
+    const lx=L.x-cam;
+    if(lx<-20||lx>W+20) continue;
+    const ly=surfaceY(L.x)+L.y+Math.sin(G.t*3+L.x)*2;
+    px(lx-6,ly-7,13,14,'#00000033');
+    text(L.c,lx-3,ly-4,P.gold,11);
+    ctx.strokeStyle=P.gold; ctx.lineWidth=1;
+    ctx.strokeRect((lx-6)+0.5,(ly-7)+0.5,12,13);
+  }
+
+  /* --- signature: the power window arc --- */
+  const rx=RIDER_X, ry=G.y;
+  const R=78;
+  for(let a=8;a<=170;a+=3){
+    const p=powerAt(a);
+    const ax=rx+Math.cos(a*Math.PI/180)*R;
+    const ay=ry-Math.sin(a*Math.PI/180)*R;
+    if(p>0.04){
+      const c = p>0.72?P.gold : p>0.4?'#c9a45a' : '#6d7f86';
+      px(ax,ay,p>0.72?2:1,p>0.72?2:1,c);
+    } else px(ax,ay,1,1,'#3d5a6b');
+  }
+  /* landing window ticks */
+  for(const a of [30,102]){
+    const ax=rx+Math.cos(a*Math.PI/180)*(R-5), ay=ry-Math.sin(a*Math.PI/180)*(R-5);
+    px(ax,ay,2,2,P.foam2);
+  }
+
+  /* kite + lines */
+  const ka=G.kite*Math.PI/180;
+  const kx=rx+Math.cos(ka)*R, ky=ry-Math.sin(ka)*R;
+  const tension=0.3+G.load*0.7+G.power*0.4;
+  ctx.strokeStyle= G.load>0.7 ? P.foam : '#9fc4cf';
+  ctx.lineWidth=1;
+  ctx.beginPath();
+  ctx.moveTo(rx-2,ry-8); ctx.lineTo(kx-Math.sin(ka)*9, ky-Math.cos(ka)*9);
+  ctx.moveTo(rx+2,ry-8); ctx.lineTo(kx+Math.sin(ka)*9, ky+Math.cos(ka)*9);
+  ctx.stroke();
+  if(tension>1.0){ px(rx-1,ry-9,3,1,P.gold); }
+
+  drawKite(kx,ky,ka);
+
+  /* spray */
+  for(const s of G.spray) px(s.x-cam,s.y,1,1,P.foam);
+
+  /* rider */
+  drawRider(rx,G.y,G.rot);
+
+  /* pops */
+  for(const p of G.pops) text(p.txt,(p.x-cam)-8,p.y,P.gold,8);
+
+  drawHUD();
+  if(G.phase!=='run') drawOverlay();
+}
+
+function drawKite(x,y,a){
+  ctx.save();
+  ctx.translate(x|0,y|0);
+  ctx.rotate(-a+Math.PI/2);
+  const cols=[P.hot,P.white,P.gold,P.white,P.hot];
+  for(let i=0;i<5;i++){
+    const t=(i-2)*7;
+    const bow=Math.abs(i-2)*2.2;
+    ctx.fillStyle=cols[i];
+    ctx.beginPath();
+    ctx.moveTo(t-3.5,-3+bow); ctx.lineTo(t+3.5,-3+bow);
+    ctx.lineTo(t+3.5,4+bow); ctx.lineTo(t-3.5,4+bow);
+    ctx.closePath(); ctx.fill();
+  }
+  ctx.fillStyle=P.dark;
+  ctx.fillRect(-18,4,36,1);
+  ctx.restore();
+}
+
+function drawRider(x,y,rot){
+  ctx.save();
+  ctx.translate(x,y);
+  ctx.rotate(rot*Math.PI/180);
+  if(G.bailT>0) ctx.rotate(Math.sin(G.t*40)*0.5);
+  /* board */
+  px(-9,1,18,3,P.gold);
+  px(-9,1,18,1,P.white);
+  /* legs */
+  px(-4,-6,3,7,P.suit); px(2,-6,3,7,P.suit);
+  /* torso */
+  px(-4,-14,8,9,P.hot);
+  /* head */
+  px(-2,-19,5,5,P.skin);
+  /* arms toward bar */
+  px(-5,-13,3,2,P.skin); px(3,-13,3,2,P.skin);
+  /* grab tell */
+  if(G.air&&G.grabHeld) px(-6,-2,4,3,P.skin);
+  ctx.restore();
+}
+
+function drawHUD(){
+  /* score block */
+  text('SCORE', 5, 4, '#9fc4cf', 7);
+  text(String(G.score).padStart(6,'0'), 5, 12, P.foam, 11);
+
+  /* combo */
+  if(G.comboMult>0){
+    const s=String(G.comboPot)+' x'+G.comboMult;
+    text(s, 5, 26, P.gold, 10);
+    px(5,38,Math.min(56,G.comboT/1.5*56),2,P.hot);
+  }
+
+  /* timer */
+  const m=Math.floor(G.time/60), sec=Math.floor(G.time%60);
+  text(m+':'+String(sec).padStart(2,'0'), W-32, 4, G.time<15?P.hot:P.foam, 11);
+
+  /* letters */
+  let lx=W-42;
+  for(const c of ['K','I','T','E']){ text(c,lx,18,G.got[c]?P.gold:'#3d5a6b',9); lx+=10; }
+
+  /* special meter */
+  const ready=G.special>=100;
+  text('LOOP', 5, H-22, ready?P.hot:'#5c7b88', 7);
+  px(5,H-13,60,4,'#0b263d');
+  px(5,H-13,(G.special/100)*60,4, ready?P.hot:P.foam2);
+  if(ready && ((G.t*4)|0)%2===0) px(4,H-14,62,6,'#ff4f5844');
+  const lb=document.querySelector('button[data-k="loop"]');
+  if(lb) lb.classList.toggle('ready',ready);
+
+  /* edge load — shown as bar under rider */
+  if(G.load>0.02){
+    px(RIDER_X-14,G.y+10,28,3,'#0b263d');
+    px(RIDER_X-14,G.y+10,(G.load/1.25)*28,3, G.load>0.9?P.gold:P.foam2);
+  }
+
+  /* coaching cue: loaded edge but kite still low = no height available */
+  if(!G.air && G.load>0.75 && G.kite<42 && ((G.t*3)|0)%2===0)
+    text('SEND THE KITE', RIDER_X-26, G.y-46, P.gold, 8);
+
+  /* trick text */
+  if(G.trickTimer>0) text(G.trickText, 5, H-32, P.foam, 9);
+  if(G.bannerT>0) text(G.banner, W/2-G.banner.length*3, 52, P.hot, 10);
+
+  /* live air readout */
+  if(G.air){
+    const half=Math.round(G.rot/180);
+    const off=Math.abs(G.rot-half*180);
+    text(Math.round(G.rot)+'°', RIDER_X-10, G.y-34, off>44?P.hot:P.gold, 9);
+  }
+}
+
+function drawOverlay(){
+  px(0,0,W,H,'#061726dd');
+  if(G.phase==='title'){
+    text('K I T E L I N E', 84, 62, P.gold, 16);
+    text('trick engine prototype', 96, 84, '#9fc4cf', 8);
+    text('Hold EDGE to load the line.', 72, 108, P.foam, 8);
+    text('Release near a lip to pop.', 74, 120, P.foam, 8);
+    text('Land with the kite in the window.', 58, 132, P.foam, 8);
+    if(((G.t*2)|0)%2===0) text('TAP OR PRESS ANY KEY', 88, 158, P.hot, 9);
+  } else {
+    text('RUN OVER', 118, 44, P.hot, 14);
+    text('SCORE  '+G.score, 110, 68, P.foam, 10);
+    text('BEST COMBO  '+G.best, 100, 82, P.gold, 9);
+    const g=G.goals;
+    const rows=[['Score 25,000',g.score],['Collect K-I-T-E',g.letters],['Land a Double Backroll',g.dbl],['2.2s of airtime',g.air]];
+    let y=104;
+    for(const r of rows){ text((r[1]?'[x] ':'[ ] ')+r[0], 84, y, r[1]?P.gold:'#6d8b98', 8); y+=13; }
+    if(((G.t*2)|0)%2===0) text('TAP TO RUN AGAIN', 100, 172, P.foam, 9);
+  }
+}
+
+/* ---------- loop ---------- */
+reset();
+let last=performance.now();
+function frame(now){
+  let dt=(now-last)/1000; last=now;
+  if(dt>0.05) dt=0.05;
+  update(dt);
+  draw();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+/* fit canvas height so the pad always has room */
+function fit(){
+  const maxH=Math.min(innerWidth, 560) * (H/W);
+  const avail=innerHeight*0.62;
+  const w=Math.min(innerWidth,560, avail*(W/H));
+  cv.style.width=w+'px';
+  document.getElementById('screen').style.maxWidth=w+'px';
+}
+addEventListener('resize',fit); fit();
+
+})();
+</script>
+</body>
+</html>

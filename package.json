@@ -1,0 +1,13 @@
+{
+  "name": "kiteline",
+  "version": "0.2.0",
+  "private": true,
+  "scripts": {
+    "serve": "python3 -m http.server 8123",
+    "test": "cypress run",
+    "test:open": "cypress open"
+  },
+  "devDependencies": {
+    "cypress": "^13.13.0"
+  }
+}
