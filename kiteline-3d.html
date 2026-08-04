@@ -931,8 +931,8 @@ const RIG={
 const rider=new THREE.Group();
 let hairGrp, lowerGrp, upperGrp, armLGrp, armRGrp, barMesh, hairLocks=[], grabArm, grabHand;
 {
-  const suit=toon(0x2B2F36), suitD=toon(0x1e2228);
-  const sk=toon(0xd99c6b);
+  const sk=toon(0xd9a074);                          // peau nue (rideuse en maillot)
+  const biki=hero(0xFF4FA3,0.28), bikiT=hero(0xFFD400,0.26);   // maillot rose, liserés jaunes
   const hairM=new THREE.MeshToonMaterial({color:0xf2d789,gradientMap:gradTex,emissive:0xb89042,emissiveIntensity:0.8}); // blond décoloré franc, lumineux même à l'ombre
   const bd=hero(0xFFD400,0.3), bdT=hero(0xFF4FA3,0.3);
   /* deck de twin-tip façon 2018 : carbone sombre, bande centrale rose, liserés jaunes */
@@ -976,10 +976,10 @@ let hairGrp, lowerGrp, upperGrp, armLGrp, armRGrp, barMesh, hairLocks=[], grabAr
   /* stance de kite construite depuis RIG (constantes anatomiques testées) :
      hanches → genoux → pieds partagent leurs points (jambes CONTINUES), pieds
      PARALLÈLES, centrés et DANS la largeur de planche, chaussons ARRONDIS. */
-  const thighF=inked(seg(RIG.hipF,RIG.kneeF,0.095,0.08,suitD));
-  const shinF =inked(seg(RIG.kneeF,RIG.footF,0.075,0.055,suitD));
-  const thighB=inked(seg(RIG.hipB,RIG.kneeB,0.095,0.08,suitD));
-  const shinB =inked(seg(RIG.kneeB,RIG.footB,0.075,0.055,suitD));
+  const thighF=inked(seg(RIG.hipF,RIG.kneeF,0.095,0.08,sk));
+  const shinF =inked(seg(RIG.kneeF,RIG.footF,0.075,0.055,sk));
+  const thighB=inked(seg(RIG.hipB,RIG.kneeB,0.095,0.08,sk));
+  const shinB =inked(seg(RIG.kneeB,RIG.footB,0.075,0.055,sk));
   /* chausson en L : la cheville (footF/B) est au TALON, le pied s'allonge vers les
      orteils (décalé de footOffX) — plus de forme en T symétrique. */
   const footF=new THREE.Mesh(new THREE.SphereGeometry(0.12,10,8),dark);
@@ -994,18 +994,28 @@ let hairGrp, lowerGrp, upperGrp, armLGrp, armRGrp, barMesh, hairLocks=[], grabAr
   }
 
   /* bassin (relié aux hanches), harnais = CEINTURE galbée (torus, pas un cube) + crochet */
-  const pelvis=inked(ball(RIG.pelvis[0],RIG.pelvis[1],RIG.pelvis[2],0.17,suit)); pelvis.scale.set(1.35,0.85,1.05);
-  const harness=new THREE.Mesh(new THREE.TorusGeometry(0.2,0.06,8,16),hn);
-  harness.rotation.x=Math.PI/2; harness.scale.set(1.0,0.72,1.0); harness.position.set(0,1.14,0.04);
-  const hook=new THREE.Mesh(new THREE.SphereGeometry(0.055,8,6),toon(0x9aa2ac)); hook.scale.set(1.3,1.0,0.7); hook.position.set(0,1.09,0.24);
-  const torso=inked(seg([0,1.12,0.02],[0,1.66,0.15],0.15,0.19,suit));
-  const chest=inked(ball(0,1.67,0.15,0.19,suit)); chest.scale.set(1.35,0.8,1.0);
+  const pelvis=inked(ball(RIG.pelvis[0],RIG.pelvis[1],RIG.pelvis[2],0.17,sk)); pelvis.scale.set(1.5,0.82,1.08);  // hanches marquées
+  const harness=new THREE.Mesh(new THREE.TorusGeometry(0.2,0.038,8,16),bikiT);   // fine ceinture de trapèze
+  harness.rotation.x=Math.PI/2; harness.scale.set(1.0,0.72,1.0); harness.position.set(0,1.15,0.04);
+  const hook=new THREE.Mesh(new THREE.SphereGeometry(0.05,8,6),toon(0x9aa2ac)); hook.scale.set(1.3,1.0,0.7); hook.position.set(0,1.11,0.22);
+  const torso=inked(seg([0,1.12,0.02],[0,1.66,0.15],0.115,0.175,sk));   // taille fine
+  const chest=inked(ball(0,1.67,0.15,0.18,sk)); chest.scale.set(1.3,0.78,1.0);
+  /* --- MAILLOT : haut (bonnets + bande + bretelles halter) et bas (culotte) --- */
+  const cupL=ball(-0.088,1.585,0.22,0.098,biki); cupL.scale.set(1.0,0.92,0.85);
+  const cupR=ball( 0.088,1.585,0.22,0.098,biki); cupR.scale.set(1.0,0.92,0.85);
+  const topBand=new THREE.Mesh(new THREE.TorusGeometry(0.155,0.022,6,18),biki);
+  topBand.rotation.x=Math.PI/2; topBand.scale.set(1.28,1.0,0.95); topBand.position.set(0,1.6,0.1);
+  const strapL=seg([-0.1,1.63,0.2],[-0.05,1.85,0.04],0.013,0.013,biki);   // bretelle vers la nuque
+  const strapR=seg([ 0.1,1.63,0.2],[ 0.05,1.85,0.04],0.013,0.013,biki);
+  const botBand=new THREE.Mesh(new THREE.TorusGeometry(0.155,0.03,6,18),biki);
+  botBand.rotation.x=Math.PI/2; botBand.scale.set(1.6,1.0,1.18); botBand.position.set(0,1.0,0.02);
+  const botFront=ball(0,0.955,0.15,0.085,biki); botFront.scale.set(1.3,1.15,0.55);
 
   /* bras vers la barre, pivotés à l'épaule */
-  const armLu=inked(seg([-0.27,1.72,0.16],[-0.31,1.6,0.34],0.06,0.055,suit));
-  const armLf=inked(seg([-0.31,1.6,0.34],[-0.24,1.5,0.48],0.05,0.045,suit));
-  const armRu=inked(seg([0.27,1.72,0.16],[0.31,1.6,0.34],0.06,0.055,suit));
-  const armRf=inked(seg([0.31,1.6,0.34],[0.24,1.5,0.48],0.05,0.045,suit));
+  const armLu=inked(seg([-0.27,1.72,0.16],[-0.31,1.6,0.34],0.06,0.055,sk));
+  const armLf=inked(seg([-0.31,1.6,0.34],[-0.24,1.5,0.48],0.05,0.045,sk));
+  const armRu=inked(seg([0.27,1.72,0.16],[0.31,1.6,0.34],0.06,0.055,sk));
+  const armRf=inked(seg([0.31,1.6,0.34],[0.24,1.5,0.48],0.05,0.045,sk));
   const handL=ball(-0.24,1.5,0.49,0.06,sk);
   const handR=ball(0.24,1.5,0.49,0.06,sk);
   armLGrp=new THREE.Group(); armLGrp.position.set(-0.27,1.72,0.16);
@@ -1017,7 +1027,7 @@ let hairGrp, lowerGrp, upperGrp, armLGrp, armRGrp, barMesh, hairLocks=[], grabAr
   barTube.rotation.z=Math.PI/2; barMesh.add(barTube);            // tube rond horizontal
   const bar=barMesh;
   /* bras + main dédiés au GRAB : visés directement sur le rail de la planche (IK) */
-  grabArm=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.042,0.4,6),suit); grabArm.visible=false;
+  grabArm=new THREE.Mesh(new THREE.CylinderGeometry(0.05,0.042,0.4,6),sk); grabArm.visible=false;
   grabHand=ball(0,0,0,0.06,sk); grabHand.visible=false;
 
   /* cou, tête, lunettes, chevelure fournie qui vole au vent */
@@ -1056,7 +1066,7 @@ let hairGrp, lowerGrp, upperGrp, armLGrp, armRGrp, barMesh, hairLocks=[], grabAr
   /* le HAUT du corps est regroupé pour l'orienter de profil vers l'aile
      (stance de kite) sans toucher à la planche/aux jambes. */
   upperGrp=new THREE.Group(); upperGrp.position.set(UPIV[0],UPIV[1],UPIV[2]);
-  for(const m of [pelvis,harness,hook,torso,chest,armLGrp,armRGrp,bar,neck,head,shades,hairGrp]){
+  for(const m of [pelvis,botBand,botFront,harness,hook,torso,chest,cupL,cupR,topBand,strapL,strapR,armLGrp,armRGrp,bar,neck,head,shades,hairGrp]){
     m.position.x-=UPIV[0]; m.position.y-=UPIV[1]; m.position.z-=UPIV[2];   // recentrés sur le pivot hanches
     upperGrp.add(m);
   }
