@@ -32,11 +32,21 @@ body{background:#0B3C5D;color:#F7FBFF;font-family:ui-monospace,"SF Mono",Menlo,C
 #loopB{width:12.5cqw;height:.9cqw;background:#0B3C5D;margin-top:.5cqw;border:1px solid #7a2a55;margin-left:auto}
 #loopF{height:100%;width:0;background:#FF4FA3}
 #veil{position:absolute;inset:0;background:#0B3C5Dee;display:flex;flex-direction:column;
- align-items:center;justify-content:safe center;text-align:center;gap:.9cqw;padding:16px;
- pointer-events:auto;overflow-y:auto;-webkit-overflow-scrolling:touch}
-#veil h1{font-size:clamp(18px,3.8cqw,46px);letter-spacing:.42em;color:#FFD400;font-weight:700}
+ align-items:center;justify-content:center;text-align:center;gap:.9cqw;padding:16px;
+ pointer-events:auto}
+#veil h1{flex:0 0 auto;font-size:clamp(18px,3.8cqw,46px);letter-spacing:.42em;color:#FFD400;font-weight:700}
+/* zone de texte : c'est ELLE qui scrolle (au doigt / molette), pas le voile entier */
+#veilText{flex:0 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+ display:flex;flex-direction:column;align-items:center;gap:.9cqw;padding:.4cqw 0;
+ -webkit-mask-image:linear-gradient(#000 92%,transparent);mask-image:linear-gradient(#000 92%,transparent)}
 #veil p{font-size:clamp(9px,1.7cqw,20px);opacity:.85;max-width:72cqw;line-height:1.8}
-#veil .go{color:#FF4FA3;font-size:clamp(10px,1.9cqw,22px);letter-spacing:.2em;margin-top:1.4cqw;animation:bl 1s steps(2) infinite}
+#veil .hint{flex:0 0 auto;color:#2ED3E6;opacity:.7;font-size:clamp(7px,1.3cqw,15px);letter-spacing:.18em}
+#startBtn{flex:0 0 auto;font-family:inherit;font-weight:700;letter-spacing:.2em;text-transform:uppercase;
+ color:#0B3C5D;background:#FFD400;border:none;border-radius:8px;cursor:pointer;
+ padding:clamp(10px,1.5cqw,18px) clamp(24px,4.4cqw,54px);font-size:clamp(13px,2.2cqw,26px);
+ box-shadow:0 3px 0 #b89a00;animation:pulse 1.3s ease-in-out infinite}
+#startBtn:active{transform:translateY(2px);box-shadow:0 1px 0 #b89a00;animation:none}
+@keyframes pulse{50%{transform:scale(1.05)}}
 @keyframes bl{50%{opacity:.15}}
 #pad{flex:0 0 auto;width:100%;max-width:600px;display:grid;grid-template-columns:1fr 1.5fr;gap:6px;padding:6px 8px}
 .grp{display:grid;gap:5px}
@@ -111,13 +121,16 @@ button.on{background:#2ED3E6;border-color:#F7FBFF;color:#0B3C5D;border-bottom-wi
   </div>
   <div id="veil">
     <h1>KITELINE</h1>
+    <div id="veilText">
     <p>Le vent souffle vers la droite. Tu glisses sur tous les caps — le largue est le plus rapide — mais jamais face au vent.</p>
     <p>L'aile n'est jamais stable : elle monte et descend au gré des risées — corrige sans cesse sa hauteur avec ▲▼. En l'air, grab + une direction choisit ta prise (grab seul Indy, ▼ Melon, ▲ Stalefish, ◀ Nuclear, ▶ Slob, Pass Tail Grab) — chaque prise a sa pose, et tu peux les enchaîner.</p>
     <p>Carre pour charger les lignes, envoie l'aile au zénith, relâche pour décoller — et garde-la haute en vol pour planer loin. Ramène-la dans la fenêtre avant de te poser, sinon c'est la chute.</p>
     <p>Si tu laisses l'aile plonger au bord de la fenêtre, elle tombe à l'eau : maintiens ▲ pour la relancer pendant que tu dérives sous le vent.</p>
     <p>L'eau blanche casse : saute par-dessus les bancs de sable et évite la plage — seul le ponton se glisse.</p>
     <p>Si tu cales face au vent, tu t'assois dans l'eau : pique l'aile (▼) dans la zone de puissance et abats pour te faire tracter dehors.</p>
-    <div class="go">TOUCHE OU CLIC POUR PARTIR</div>
+    <p class="hint">↕ fais défiler pour tout lire</p>
+    </div>
+    <button id="startBtn" type="button">C'EST PARTI ▸</button>
   </div>
 </div>
 <div id="pad">
@@ -266,6 +279,9 @@ const SPINS={1:'180',2:'360',3:'540',4:'720',5:'900',6:'1080'};
 function newState(){
   return {
     t:0, time:180, phase:'title',
+    /* départ dans un couloir dégagé, cap 0 (vers +Z) : la bouée « K » est placée
+       droit devant (voir letters), donc l'objectif est visible d'entrée. Vent « à
+       droite » (+X). */
     x:-80, z:0, y:0, vy:0, heading:0, speed:8, switchy:false,
     kite:60, kiteVel:0, power:0, lift:0, eff:0, load:0, air:false, airT:0, wasEdge:false, edging:false,
     spin:0, roll:0, grabT:0, grabHeld:false, grabName:'', grabsDone:[], passes:0, passCD:0,
@@ -274,7 +290,7 @@ function newState(){
     sat:0, satCD:0, satSplash:null,
     score:0, pot:0, mult:0, comboT:0, special:0, loopT:0, loopBoost:0, best:0,
     trick:'', trickT:0, banner:'', bannerT:0, bailT:0,
-    letters:[{x:-120,z:-26,c:'K'},{x:30,z:-36,c:'I'},{x:-40,z:-106,c:'T'},{x:90,z:114,c:'E'}].map(l=>({...l,got:false})),
+    letters:[{x:-80,z:45,c:'K'},{x:30,z:-36,c:'I'},{x:-40,z:-106,c:'T'},{x:90,z:114,c:'E'}].map(l=>({...l,got:false})),
     got:{}, maxAir:0, maxH:0, goals:{score:0,letters:0,pier:0,air:0,upwind:0}
   };
 }
@@ -1336,40 +1352,29 @@ const MAP={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'kup',ArrowDown:'kdown',
 addEventListener('keydown',e=>{
   if(e.code==='KeyR'){restart();e.preventDefault();return;}
   if(e.repeat)return; const k=MAP[e.code];
+  /* les touches pilotent le jeu, mais ne le DÉMARRENT pas : le lancement se fait
+     uniquement via le bouton START (sinon « n'importe quelle touche » démarrait). */
   if(k){setK(k,1);e.preventDefault();}
-  if(PROBE.phase!=='run')begin();
 });
 addEventListener('keyup',e=>{const k=MAP[e.code];if(k){setK(k,0);e.preventDefault();}});
 document.querySelectorAll('[data-k]').forEach(b=>{
   const k=b.dataset.k;
-  b.addEventListener('pointerdown',e=>{e.preventDefault();if(PROBE.phase!=='run')begin();setK(k,1);
+  b.addEventListener('pointerdown',e=>{e.preventDefault();setK(k,1);   // ne démarre pas : START seul lance
     try{b.setPointerCapture(e.pointerId)}catch(_){}});
   const up=e=>{e.preventDefault();setK(k,0)};
   b.addEventListener('pointerup',up); b.addEventListener('pointercancel',up);
 });
-document.getElementById('veil').addEventListener('pointerdown',e=>{e.preventDefault();begin()});
+/* le jeu démarre UNIQUEMENT via le bouton (pas au clic n'importe où : sinon on ne
+   pourrait pas faire défiler le texte au doigt sans lancer la partie). */
+document.getElementById('startBtn').addEventListener('click',e=>{e.preventDefault();begin();});
 
 /* ================= BOUCLE ================= */
 const veil=document.getElementById('veil');
-/* si le texte du veil déborde (petit écran), on l'auto-scrolle après 2 s pour qu'il
-   soit lisible en entier au lieu d'être tronqué. */
-let veilScrollT=null;
-function veilAutoScroll(){
-  clearTimeout(veilScrollT); veil.scrollTop=0;
-  veilScrollT=setTimeout(()=>{
-    const max=veil.scrollHeight-veil.clientHeight;
-    if(max<=4||veil.style.display==='none') return;
-    const t0=performance.now(), dur=Math.min(7000,1600+max*10);
-    (function loop(t){
-      if(veil.style.display==='none') return;
-      const k=Math.min(1,(t-t0)/dur);
-      veil.scrollTop=max*(k<0.5?2*k*k:1-Math.pow(-2*k+2,2)/2);   // ease in-out
-      if(k<1) requestAnimationFrame(loop);
-    })(performance.now());
-  },2000);
-}
+/* le texte est désormais scrollable au doigt/molette (zone #veilText) : on ne fait
+   plus d'auto-scroll (il se battait avec l'utilisateur). On remet juste en haut. */
+function veilAutoScroll(){ const t=document.getElementById('veilText'); if(t)t.scrollTop=0; }
 let _gcRun=false;
-function begin(){ clearTimeout(veilScrollT); if(PROBE.phase==='over')restart(); PROBE.phase='run'; veil.style.display='none';
+function begin(){ if(PROBE.phase==='over')restart(); PROBE.phase='run'; veil.style.display='none';
   if(!_gcRun){ _gcRun=true; try{ window.goatcounter&&window.goatcounter.count({path:'partie',title:'Partie lancée',event:true}); }catch(_){} } }
 function restart(){
   PROBE=newState();
@@ -1725,14 +1730,15 @@ function hud(G){
   mini(G);
   if(G.phase==='over'&&veil.style.display==='none'){
     const g=G.goals;
-    veil.innerHTML='<h1>FIN DE RUN</h1><p style="font-size:clamp(14px,2.9cqw,34px);color:#FFD400;opacity:1">'
+    veil.innerHTML='<h1>FIN DE RUN</h1><div id="veilText">'
+      +'<p style="font-size:clamp(14px,2.9cqw,34px);color:#FFD400;opacity:1">'
       +G.score.toLocaleString('fr-FR')+'</p><p>meilleur combo '+G.best.toLocaleString('fr-FR')+'</p><p style="text-align:left">'
       +[['40 000 points',g.score],['les 4 bouées K-I-T-E',g.letters],['glisser sur le ponton',g.pier],
         ['2,2 s en l\'air',g.air],['remonter tout au vent',g.upwind]]
         .map(r=>(r[1]?'<span style="color:#FFD400">☑ ':'<span style="color:#4a6b7e">☐ ')+r[0]+'</span>').join('<br>')
-      +'</p><div class="go">TOUCHE POUR REJOUER</div>';
+      +'</p></div><button id="startBtn" type="button">REJOUER ▸</button>';
     veil.style.display='flex'; veilAutoScroll();
-    veil.addEventListener('pointerdown',e=>{e.preventDefault();restart()},{once:true});
+    document.getElementById('startBtn').addEventListener('click',e=>{e.preventDefault();restart();});
   }
 }
 

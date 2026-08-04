@@ -17,6 +17,11 @@ describe('captures visuelles', () => {
     shot('01-titre');
   });
 
+  it('01b — vue de départ (bouée droit devant)', () => {
+    cy.window().then(w => { w.KITELINE.begin(); w.KITELINE.step(0.05); });
+    shot('01b-depart');
+  });
+
   it('02 — navigation au travers', () => {
     cy.window().then(w => {
       w.KITELINE.begin();

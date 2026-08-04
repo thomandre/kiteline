@@ -35,13 +35,18 @@ describe('mapping des contrôles', () => {
     });
   });
 
-  it('une touche mappée démarre la partie depuis le titre', () => {
+  it('le jeu démarre via le bouton START, pas au clavier ni au clic sur le voile', () => {
+    cy.get('#veilText').should('exist');          // le texte est dans une zone scrollable
+    cy.get('#startBtn').should('be.visible');
     cy.window().then(w => {
       expect(w.KITELINE.G.phase).to.eq('title');
       w.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' }));
-      expect(w.KITELINE.G.phase).to.eq('run');
+      expect(w.KITELINE.G.phase, 'une touche ne démarre pas').to.eq('title');
       w.dispatchEvent(new KeyboardEvent('keyup', { code: 'Space' }));
     });
+    cy.get('#veil').should('be.visible');
+    cy.get('#startBtn').click();
+    cy.window().then(w => expect(w.KITELINE.G.phase).to.eq('run'));
     cy.get('#veil').should('not.be.visible');
   });
 
