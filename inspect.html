@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>KITELINE — Inspecteur surfeuse (réaliste)</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:#9fc6d8;font-family:ui-monospace,Menlo,monospace}
+  #app{position:fixed;inset:0}
+  canvas{display:block}
+  #panel{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:9;display:flex;gap:6px;
+    align-items:center;flex-wrap:wrap;justify-content:center;max-width:96vw;
+    background:#0B3C5Dcc;border:1px solid #2ED3E6;border-radius:10px;padding:8px 10px;backdrop-filter:blur(3px)}
+  #panel b{color:#FFD400;letter-spacing:.2em;font-size:11px;margin-right:4px}
+  #panel button{font:inherit;font-size:11px;text-transform:uppercase;color:#F7FBFF;background:#2B2F36;
+    border:1px solid #2ED3E6;border-radius:5px;padding:6px 9px;cursor:pointer}
+  #panel button.on{background:#2ED3E6;color:#0B3C5D}
+  #panel input{font:inherit;font-size:11px;color:#F7FBFF;background:#0b2432;border:1px solid #2ED3E6;
+    border-radius:5px;padding:6px 8px;width:210px}
+  #panel input::placeholder{color:#6f93a6}
+  #note{color:#2ED3E6;font-size:10px;min-width:60px}
+  #hint{position:fixed;top:10px;left:50%;transform:translateX(-50%);color:#0B3C5D;opacity:.6;font-size:11px;letter-spacing:.1em}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="hint">glisse pour tourner · molette pour zoomer</div>
+<div id="panel">
+  <b>SURFEUSE</b>
+  <button id="bBlonde" class="on">blonde</button>
+  <button id="bSpin" class="on">⟳ rotation</button>
+  <input id="url" placeholder="URL .glb (avaturn, Sketchfab…)" spellcheck="false">
+  <button id="bLoad">charger</button>
+  <span id="note"></span>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+const DEFAULT='https://cdn.jsdelivr.net/gh/met4citizen/TalkingHead@main/avatars/brunette.glb';
+const BLONDE=0xE7C86B;
+const app=document.getElementById('app'), note=t=>document.getElementById('note').textContent=t;
+
+const scene=new THREE.Scene(); scene.background=new THREE.Color(0x9fc6d8);
+scene.fog=new THREE.Fog(0x9fc6d8, 8, 22);
+const cam=new THREE.PerspectiveCamera(42, innerWidth/innerHeight, 0.1, 100);
+cam.position.set(0,1.35,3.2);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2)); renderer.setSize(innerWidth,innerHeight);
+renderer.outputEncoding=THREE.sRGBEncoding;
+renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.0;
+app.appendChild(renderer.domElement);
+
+/* éclairage PBR */
+scene.add(new THREE.HemisphereLight(0xffffff,0x4a5a68,1.0));
+const key=new THREE.DirectionalLight(0xffffff,2.1); key.position.set(3,6,4); scene.add(key);
+const fill=new THREE.DirectionalLight(0xbfe0ff,0.7); fill.position.set(-4,2,-3); scene.add(fill);
+const rim=new THREE.DirectionalLight(0xffffff,0.6); rim.position.set(0,3,-5); scene.add(rim);
+/* sol */
+const ground=new THREE.Mesh(new THREE.CircleGeometry(5,48),
+  new THREE.MeshStandardMaterial({color:0x2a6a86,roughness:1,metalness:0}));
+ground.rotation.x=-Math.PI/2; scene.add(ground);
+
+const controls=new THREE.OrbitControls(cam, renderer.domElement);
+controls.target.set(0,0.95,0); controls.enableDamping=true; controls.dampingFactor=0.08;
+controls.autoRotate=true; controls.autoRotateSpeed=1.4; controls.minDistance=1.2; controls.maxDistance=8;
+controls.update();
+
+let avatar=null, blonde=true, curUrl=DEFAULT;
+function tintHair(hex){ if(!avatar) return; avatar.traverse(o=>{ if(!o.isMesh) return;
+  const ms=Array.isArray(o.material)?o.material:[o.material];
+  ms.forEach(m=>{ if(m&&/hair/i.test((m.name||'')+' '+(o.name||''))){ m.map=null; if(m.color)m.color.setHex(hex); m.needsUpdate=true; } });
+}); }
+function load(url){ curUrl=url; note('chargement…');
+  new THREE.GLTFLoader().load(url, g=>{
+    if(avatar) scene.remove(avatar);
+    avatar=g.scene;
+    const box=new THREE.Box3().setFromObject(avatar), sz=new THREE.Vector3(); box.getSize(sz);
+    const s=1.7/(sz.y||1.7); avatar.scale.setScalar(s);
+    const b2=new THREE.Box3().setFromObject(avatar), c=new THREE.Vector3(); b2.getCenter(c);
+    avatar.position.x-=c.x; avatar.position.z-=c.z; avatar.position.y-=b2.min.y;   // pieds au sol
+    scene.add(avatar);
+    if(blonde) tintHair(BLONDE);
+    window.__avatar=avatar; note('✓');
+  }, undefined, e=>{ console.error(e); note('échec (URL/CORS ?)'); });
+}
+document.getElementById('bBlonde').onclick=e=>{ blonde=!blonde; e.target.classList.toggle('on',blonde); load(curUrl); };
+document.getElementById('bSpin').onclick=e=>{ controls.autoRotate=!controls.autoRotate; e.target.classList.toggle('on',controls.autoRotate); };
+document.getElementById('bLoad').onclick=()=>{ const u=document.getElementById('url').value.trim(); if(u) load(u); };
+document.getElementById('url').addEventListener('keydown',e=>{ if(e.key==='Enter'){ const u=e.target.value.trim(); if(u) load(u); } });
+
+addEventListener('resize',()=>{ cam.aspect=innerWidth/innerHeight; cam.updateProjectionMatrix(); renderer.setSize(innerWidth,innerHeight); });
+load(DEFAULT);
+(function anim(){ requestAnimationFrame(anim); controls.update(); renderer.render(scene,cam); })();
+</script>
+</body>
+</html>
