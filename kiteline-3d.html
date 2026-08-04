@@ -31,6 +31,13 @@ body{background:#0B3C5D;color:#F7FBFF;font-family:ui-monospace,"SF Mono",Menlo,C
 #hLoop{bottom:1cqw;right:1.4cqw;font-size:clamp(7px,1.4cqw,16px);letter-spacing:.18em;text-align:right}
 #loopB{width:12.5cqw;height:.9cqw;background:#0B3C5D;margin-top:.5cqw;border:1px solid #7a2a55;margin-left:auto}
 #loopF{height:100%;width:0;background:#FF4FA3}
+/* bouton son : hors du #hud (qui est pointer-events:none), coin haut, discret */
+#sndBtn{position:absolute;top:6px;left:50%;transform:translateX(-50%);z-index:4;display:none;
+ width:34px;height:30px;padding:0;border:1px solid #2ED3E6;border-radius:6px;
+ background:#0B3C5Db3;color:#F7FBFF;font-size:15px;line-height:1;cursor:pointer;
+ opacity:.72;-webkit-tap-highlight-color:transparent}
+#sndBtn:hover{opacity:1}
+#sndBtn.off{border-color:#7a2a55;opacity:.6}
 #veil{position:absolute;inset:0;background:#0B3C5Dee;display:flex;flex-direction:column;
  align-items:center;justify-content:center;text-align:center;gap:.9cqw;padding:16px;
  pointer-events:auto}
@@ -119,6 +126,7 @@ button.on{background:#2ED3E6;border-color:#F7FBFF;color:#0B3C5D;border-bottom-wi
     <div class="h" id="hWind">CAP <i id="pa">--</i>° DU VENT<canvas id="rose" width="64" height="64"></canvas></div>
     <div class="h" id="hLoop">LOOP<div id="loopB"><div id="loopF"></div></div></div>
   </div>
+  <button id="sndBtn" type="button" aria-label="Activer / couper le son">🔊</button>
   <div id="veil">
     <h1>KITELINE</h1>
     <div id="veilText">
@@ -1334,6 +1342,63 @@ function sprayTick(G,dt){
   poolTick(spray,dt);
 }
 
+/* ================= SONS (Web Audio, 100% synthétisé — aucun asset) =================
+   Rien n'est créé tant qu'un VRAI geste utilisateur (isTrusted) n'a pas eu lieu :
+   les tests headless (events dispatchés) ne déclenchent donc aucun audio. Tout est
+   gardé par `if(!AC||muted)` → jamais d'exception si l'audio est indispo. */
+const SND=(()=>{
+  let AC=null, master=null, wind=null, windGain=null, windFilt=null, noiseBuf=null, muted=false;
+  function ensure(){
+    if(AC) return AC;
+    try{ AC=new (window.AudioContext||window.webkitAudioContext)(); }catch(_){ AC=null; return null; }
+    master=AC.createGain(); master.gain.value=muted?0:0.85; master.connect(AC.destination);
+    noiseBuf=AC.createBuffer(1,Math.floor(AC.sampleRate*1.5),AC.sampleRate);
+    const d=noiseBuf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=Math.random()*2-1;
+    wind=AC.createBufferSource(); wind.buffer=noiseBuf; wind.loop=true;
+    windFilt=AC.createBiquadFilter(); windFilt.type='bandpass'; windFilt.frequency.value=500; windFilt.Q.value=0.6;
+    windGain=AC.createGain(); windGain.gain.value=0;
+    wind.connect(windFilt); windFilt.connect(windGain); windGain.connect(master); wind.start();
+    return AC;
+  }
+  function resume(ev){ if(ev&&ev.isTrusted===false) return; const a=ensure(); if(a&&a.state==='suspended') a.resume(); }
+  function tone(freq,dur,o){ o=o||{}; if(!AC||muted) return;
+    const t=AC.currentTime+(o.delay||0), osc=AC.createOscillator(), g=AC.createGain();
+    osc.type=o.type||'sine'; osc.frequency.setValueAtTime(freq,t);
+    if(o.glide!=null) osc.frequency.exponentialRampToValueAtTime(Math.max(1,o.glide),t+dur);
+    g.gain.setValueAtTime(0.0001,t); g.gain.exponentialRampToValueAtTime(o.gain||0.3,t+0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    osc.connect(g); g.connect(master); osc.start(t); osc.stop(t+dur+0.03);
+  }
+  function noise(dur,o){ o=o||{}; if(!AC||muted) return;
+    const t=AC.currentTime+(o.delay||0), s=AC.createBufferSource(), bf=AC.createBiquadFilter(), g=AC.createGain();
+    s.buffer=noiseBuf; bf.type=o.type||'lowpass'; bf.frequency.setValueAtTime(o.f0||800,t); bf.Q.value=o.q||0.7;
+    if(o.f1!=null) bf.frequency.exponentialRampToValueAtTime(Math.max(40,o.f1),t+dur);
+    g.gain.setValueAtTime(o.gain||0.4,t); g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    s.connect(bf); bf.connect(g); g.connect(master); s.start(t); s.stop(t+dur+0.03);
+  }
+  function arp(freqs,step,o){ o=o||{}; freqs.forEach((f,i)=>tone(f,o.dur||0.16,{type:o.type||'triangle',gain:o.gain||0.24,delay:i*(step||0.06)})); }
+  return {
+    resume,
+    setMuted(m){ muted=m; if(master) master.gain.setTargetAtTime(m?0:0.85, AC.currentTime, 0.02); },
+    isMuted(){ return muted; },
+    /* rush continu piloté par la vitesse (appelé chaque frame) */
+    ambient(speed,air,edging){ if(!AC||muted||!windGain) return;
+      const spd=Math.min(1,speed/22), t=AC.currentTime;
+      windGain.gain.setTargetAtTime((air?0.12:0.045)+spd*0.11+(edging?0.05:0), t, 0.15);
+      windFilt.frequency.setTargetAtTime(300+spd*900+(air?600:0), t, 0.15);
+    },
+    jump(){ noise(0.5,{gain:0.32,type:'bandpass',f0:280,f1:1500,q:0.6}); tone(170,0.42,{type:'sawtooth',gain:0.11,glide:540}); },
+    land(){ noise(0.26,{gain:0.5,type:'lowpass',f0:900,f1:110}); tone(90,0.18,{type:'sine',gain:0.22,glide:48}); },
+    grab(){ tone(560,0.07,{type:'square',gain:0.13}); },
+    bank(mult){ arp([523.25,659.25,783.99,1046.5].slice(0,Math.max(2,Math.min(4,(mult||1)+1))),0.06,{type:'triangle',gain:0.2}); },
+    collect(){ arp([784,1046.5,1318.5],0.05,{type:'sine',gain:0.26,dur:0.18}); },
+    loopReady(){ arp([659.25,987.77],0.09,{type:'triangle',gain:0.18}); },
+    splash(big){ noise(big?0.55:0.38,{gain:big?0.55:0.42,type:'highpass',f0:1300,f1:4200,q:0.5}); noise(big?0.5:0.3,{gain:0.28,type:'lowpass',f0:600,f1:140}); },
+    crash(){ noise(0.7,{gain:0.6,type:'lowpass',f0:520,f1:80,q:0.9}); tone(68,0.5,{type:'sawtooth',gain:0.18,glide:34}); },
+    click(){ tone(660,0.05,{type:'square',gain:0.12}); tone(990,0.05,{type:'square',gain:0.1,delay:0.045}); }
+  };
+})();
+
 /* ================= ENTRÉES ================= */
 const KEYS={left:0,right:0,kup:0,kdown:0,edge:0,spin:0,roll:0,grab:0,pass:0,loop:0};
 const PRESS={};
@@ -1350,6 +1415,7 @@ const MAP={ArrowLeft:'left',ArrowRight:'right',ArrowUp:'kup',ArrowDown:'kdown',
  KeyJ:'spin',KeyK:'roll',KeyL:'grab',KeyM:'pass',
  Space:'edge',ShiftLeft:'loop',ShiftRight:'loop'};
 addEventListener('keydown',e=>{
+  SND.resume(e);
   if(e.code==='KeyR'){restart();e.preventDefault();return;}
   if(e.repeat)return; const k=MAP[e.code];
   /* les touches pilotent le jeu, mais ne le DÉMARRENT pas : le lancement se fait
@@ -1359,14 +1425,21 @@ addEventListener('keydown',e=>{
 addEventListener('keyup',e=>{const k=MAP[e.code];if(k){setK(k,0);e.preventDefault();}});
 document.querySelectorAll('[data-k]').forEach(b=>{
   const k=b.dataset.k;
-  b.addEventListener('pointerdown',e=>{e.preventDefault();setK(k,1);   // ne démarre pas : START seul lance
+  b.addEventListener('pointerdown',e=>{e.preventDefault();SND.resume(e);setK(k,1);   // ne démarre pas : START seul lance
     try{b.setPointerCapture(e.pointerId)}catch(_){}});
   const up=e=>{e.preventDefault();setK(k,0)};
   b.addEventListener('pointerup',up); b.addEventListener('pointercancel',up);
 });
 /* le jeu démarre UNIQUEMENT via le bouton (pas au clic n'importe où : sinon on ne
    pourrait pas faire défiler le texte au doigt sans lancer la partie). */
-document.getElementById('startBtn').addEventListener('click',e=>{e.preventDefault();begin();});
+document.getElementById('startBtn').addEventListener('click',e=>{e.preventDefault();SND.resume(e);SND.click();begin();});
+/* bouton son : coupe/rétablit et initialise l'audio au passage */
+(()=>{ const sb=document.getElementById('sndBtn');
+  sb.addEventListener('click',e=>{e.preventDefault();SND.resume(e);
+    const m=!SND.isMuted(); SND.setMuted(m); sb.textContent=m?'🔇':'🔊'; sb.classList.toggle('off',m);
+    if(!m) SND.click();
+  });
+})();
 
 /* ================= BOUCLE ================= */
 const veil=document.getElementById('veil');
@@ -1387,7 +1460,8 @@ const el={score:document.querySelector('#hScore b'),combo:document.getElementByI
  trick:document.getElementById('hTrick'),ban:document.getElementById('hBanner'),
  airEl:document.getElementById('hAir'),
  pa:document.getElementById('pa'),
- loop:document.getElementById('loopF'),loopB:document.getElementById('bLoop')};
+ loop:document.getElementById('loopF'),loopB:document.getElementById('bLoop'),
+ snd:document.getElementById('sndBtn')};
 const mctx=document.getElementById('mini').getContext('2d');
 const rctx=document.getElementById('rose').getContext('2d');
 
@@ -1437,14 +1511,32 @@ const _m=new THREE.Matrix4(), _vx=new THREE.Vector3(), _vy=new THREE.Vector3(), 
 const _p1=new THREE.Vector3(), _p2=new THREE.Vector3(), _d=new THREE.Vector3(), _YUP=new THREE.Vector3(0,1,0);
 let last=performance.now();
 
+/* sons pilotés par les TRANSITIONS d'état (détectées ici, hors du noyau physique
+   qui reste pur/testable). Tout est no-op tant que l'audio n'est pas initialisé. */
+let _snd={air:false,crashT:0,score:0,letters:0,kiteWet:false,grab:false,special:0};
+function sndEvents(G){
+  SND.ambient(G.speed,G.air,G.edging);
+  if(G.air&&!_snd.air) SND.jump();
+  else if(!G.air&&_snd.air&&G.crashT<=0) SND.land();
+  if(G.crashT>0&&_snd.crashT<=0) SND.crash();
+  if(G.kiteWet&&!_snd.kiteWet) SND.splash(true);
+  if(G.grabHeld&&!_snd.grab) SND.grab();
+  if(G.score>_snd.score) SND.bank(G.mult);
+  const lc=G.letters.reduce((n,l)=>n+(l.got?1:0),0);
+  if(lc>_snd.letters) SND.collect();
+  if(G.special>=100&&_snd.special<100) SND.loopReady();
+  _snd.air=G.air; _snd.crashT=G.crashT; _snd.score=G.score; _snd.letters=lc;
+  _snd.kiteWet=G.kiteWet; _snd.grab=G.grabHeld; _snd.special=G.special;
+}
 function frame(now){
   let dt=(now-last)/1000; last=now;
   if(dt>0.05)dt=0.05;
   const G=PROBE;
   step(G,KEYS,PRESS,dt);
+  sndEvents(G);
 
   if(G.splash){ splashAt(G.splash.x,G.splash.y,G.splash.z); G.splash=null; }
-  if(G.satSplash){ splashAt(G.satSplash.x,G.satSplash.y,G.satSplash.z,10); G.satSplash=null; }
+  if(G.satSplash){ splashAt(G.satSplash.x,G.satSplash.y,G.satSplash.z,10); SND.splash(false); G.satSplash=null; }
   poolTick(splash,dt);
   sprayTick(G,dt);
   ringTick(dt);
@@ -1708,6 +1800,7 @@ function mini(G){
 }
 
 function hud(G){
+  el.snd.style.display=(veil.style.display==='none')?'block':'none';   // son visible en jeu seulement
   el.score.textContent=G.score.toLocaleString('fr-FR');
   el.combo.textContent=G.mult>0?(G.pot+'  x'+G.mult):'';
   const m=Math.floor(G.time/60),s=Math.floor(G.time%60);
@@ -1738,7 +1831,7 @@ function hud(G){
         .map(r=>(r[1]?'<span style="color:#FFD400">☑ ':'<span style="color:#4a6b7e">☐ ')+r[0]+'</span>').join('<br>')
       +'</p></div><button id="startBtn" type="button">REJOUER ▸</button>';
     veil.style.display='flex'; veilAutoScroll();
-    document.getElementById('startBtn').addEventListener('click',e=>{e.preventDefault();restart();});
+    document.getElementById('startBtn').addEventListener('click',e=>{e.preventDefault();SND.resume(e);SND.click();restart();});
   }
 }
 
